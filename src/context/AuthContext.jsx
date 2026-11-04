@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
+// Authentication and user profile context
 const AuthContext = createContext(null)
 
 const MOCK_STORAGE_KEY = 'recumend_mock_user'
 
+// Generates a random short user ID (e.g. u_8f29c4) for mock profiles
 function generateAppUid() {
   const chars = 'abcdef0123456789'
   let result = 'u_'
@@ -14,67 +16,56 @@ function generateAppUid() {
   return result
 }
 
+// Reads OAuth redirect error parameters from the URL if login was cancelled or failed
+function getInitialAuthError() {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.search)
+  const errorParam = params.get('error')
+  const errorDesc = params.get('error_description')
+  if (errorParam || errorDesc) {
+    const msg = errorDesc || errorParam || 'Authentication was cancelled or failed'
+    params.delete('error')
+    params.delete('error_description')
+    params.delete('error_code')
+    const newQuery = params.toString() ? `?${params.toString()}` : ''
+    window.history.replaceState(null, '', window.location.pathname + newQuery + window.location.hash)
+    return decodeURIComponent(msg)
+  }
+  return null
+}
+
+// Retrieves mock user data from localStorage for offline demo preview
+function getInitialMockState() {
+  if (typeof window === 'undefined') return { user: null, profile: null }
+  const saved = localStorage.getItem(MOCK_STORAGE_KEY)
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      return { user: { id: parsed.id, email: parsed.email }, profile: parsed }
+    } catch {
+      // ignore JSON parse errors
+    }
+  }
+  return { user: null, profile: null }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(() => (!isSupabaseConfigured ? getInitialMockState().user : null))
+  const [profile, setProfile] = useState(() => (!isSupabaseConfigured ? getInitialMockState().profile : null))
+  const [loading, setLoading] = useState(isSupabaseConfigured)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [authError, setAuthError] = useState(getInitialAuthError)
 
-  // Initialize Auth
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      // Local development fallback
-      const saved = localStorage.getItem(MOCK_STORAGE_KEY)
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          setUser({ id: parsed.id, email: parsed.email })
-          setProfile(parsed)
-        } catch {
-          // ignore corrupted data
-        }
-      }
-      setLoading(false)
-      return
-    }
-
-    // Real Supabase session
-    async function getSession() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        setUser(session.user)
-        await fetchProfile(session.user)
-      }
-      setLoading(false)
-    }
-
-    getSession()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        await fetchProfile(session.user)
-        // Immediately scrub any auth code or hash tokens from URL bar so they never linger
-        if (typeof window !== 'undefined') {
-          if (window.location.hash?.includes('access_token') || window.location.search?.includes('code=')) {
-            const cleanHash = window.location.hash?.startsWith('#/u/') ? window.location.hash : ''
-            window.history.replaceState(null, '', window.location.pathname + cleanHash)
-          }
-        }
-      } else {
-        setUser(null)
-        setProfile(null)
-      }
-      setLoading(false)
-    })
-
-    return () => subscription.unsubscribe()
+  const clearAuthError = useCallback(() => {
+    setAuthError(null)
   }, [])
 
-  async function fetchProfile(authUser) {
-    if (!isSupabaseConfigured) return
+  // Fetch profile from Supabase and sync Google profile image if needed
+  const fetchProfile = useCallback(async (authUser) => {
+    if (!isSupabaseConfigured || !authUser?.id) return null
 
     try {
-      // Extract Google OAuth profile picture from all standard Google claims
+      // Extract Google OAuth profile picture from standard Google claims
       const googleAvatar =
         authUser.user_metadata?.avatar_url ||
         authUser.user_metadata?.picture ||
@@ -86,7 +77,11 @@ export function AuthProvider({ children }) {
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single()
+        .maybeSingle()
+
+      if (error) {
+        console.warn('Profile fetch note:', error.message)
+      }
 
       if (data) {
         // If user logged in with Google and DB profile is missing avatar or has old placeholder, sync it
@@ -107,17 +102,26 @@ export function AuthProvider({ children }) {
               .select()
               .single()
 
-            setProfile(updated || { ...data, avatar_url: googleAvatar })
+            const finalProfile = updated || { ...data, avatar_url: googleAvatar }
+            setProfile(finalProfile)
+            return finalProfile
           } catch (syncErr) {
             console.warn('Avatar sync to DB failed:', syncErr)
-            setProfile({ ...data, avatar_url: googleAvatar })
+            const fallbackProfile = { ...data, avatar_url: googleAvatar }
+            setProfile(fallbackProfile)
+            return fallbackProfile
           }
         } else {
           setProfile(data)
+          return data
         }
       } else {
-        // Auto create profile on first login with genuine Google avatar
-        const emailPrefix = (authUser.email || 'user').split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '')
+        // Create new profile record on first login
+        const emailPrefix = (authUser.email || 'user')
+          .split('@')[0]
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '')
+          .slice(0, 20) || 'user'
         const newProfile = {
           id: authUser.id,
           app_uid: generateAppUid(),
@@ -126,21 +130,82 @@ export function AuthProvider({ children }) {
           avatar_url: googleAvatar,
         }
 
-        const { data: created } = await supabase
+        const { data: created, error: insertError } = await supabase
           .from('profiles')
           .insert(newProfile)
           .select()
           .single()
 
-        setProfile(created || newProfile)
+        if (insertError) {
+          console.warn('First-time profile insert error:', insertError.message)
+        }
+
+        const finalProfile = created || newProfile
+        setProfile(finalProfile)
+        return finalProfile
       }
     } catch (err) {
       console.error('Failed to fetch profile:', err)
+      return null
     }
-  }
+  }, [])
 
-  // Google OAuth Sign In
+  // Check active session and listen to auth changes (sign in, token refresh, sign out)
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      return
+    }
+
+    // Restore existing session on mount
+    async function getSession() {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) {
+          console.warn('Supabase getSession warning:', error.message)
+        }
+        if (session?.user) {
+          setUser(session.user)
+          await fetchProfile(session.user)
+        }
+      } catch (err) {
+        console.error('getSession exception:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    getSession()
+
+    // Listen for auth state events from Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        setIsAuthenticating(false)
+        setAuthError(null)
+        await fetchProfile(session.user)
+        // Clean any auth code or hash tokens from URL bar after exchange is confirmed
+        if (typeof window !== 'undefined') {
+          if (window.location.hash?.includes('access_token') || window.location.search?.includes('code=')) {
+            const cleanHash = window.location.hash?.startsWith('#/u/') ? window.location.hash : ''
+            window.history.replaceState(null, '', window.location.pathname + cleanHash)
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        setIsAuthenticating(false)
+      }
+      setLoading(false)
+    })
+
+    return () => subscription?.unsubscribe?.()
+  }, [fetchProfile])
+
+  // Sign in using Google OAuth (or set demo user in offline mode)
   async function signInWithGoogle() {
+    setIsAuthenticating(true)
+    setAuthError(null)
+
     if (!isSupabaseConfigured) {
       // Mock Google Login for local preview
       const mockId = 'demo-user-123'
@@ -155,20 +220,143 @@ export function AuthProvider({ children }) {
       setUser({ id: mockId, email: mockProf.email })
       setProfile(mockProf)
       localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(mockProf))
-      return
+      setIsAuthenticating(false)
+      return { success: true }
     }
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
+    try {
+      // Trigger OAuth flow with redirect
+      const redirectUri = typeof window !== 'undefined' ? window.location.origin : ''
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account'
+          }
+        }
+      })
+
+      if (error) throw error
+
+      // Direct fallback if browser did not auto navigate
+      if (data?.url && typeof window !== 'undefined') {
+        window.location.assign(data.url)
       }
-    })
-    if (error) throw error
+      return { success: true, data }
+    } catch (err) {
+      console.error('Google OAuth sign-in failed:', err)
+      const message = err.message || 'Google sign-in could not be initiated.'
+      setAuthError(message)
+      setIsAuthenticating(false)
+      return { error: message }
+    }
   }
 
-  // Sign out
+  // Sign in with email and password
+  async function signInWithEmail(email, password) {
+    setIsAuthenticating(true)
+    setAuthError(null)
+
+    if (!isSupabaseConfigured) {
+      const mockId = 'demo-user-123'
+      const cleanPrefix = (email.split('@')[0] || 'user').toLowerCase()
+      const mockProf = {
+        id: mockId,
+        app_uid: 'u_8f29c4',
+        username: cleanPrefix,
+        display_name: cleanPrefix,
+        avatar_url: null,
+        email: email.trim()
+      }
+      setUser({ id: mockId, email: mockProf.email })
+      setProfile(mockProf)
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(mockProf))
+      setIsAuthenticating(false)
+      return { success: true }
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password
+      })
+      if (error) throw error
+      if (data?.user) {
+        setUser(data.user)
+        await fetchProfile(data.user)
+      }
+      setIsAuthenticating(false)
+      return { success: true, user: data.user }
+    } catch (err) {
+      console.error('Email sign in error:', err)
+      const message = err.message || 'Sign in failed'
+      setAuthError(message)
+      setIsAuthenticating(false)
+      return { error: message }
+    }
+  }
+
+  // Register a new user with email and password
+  async function signUpWithEmail(email, password, displayName) {
+    setIsAuthenticating(true)
+    setAuthError(null)
+
+    if (!isSupabaseConfigured) {
+      const mockId = `demo-user-${Date.now()}`
+      const cleanName = displayName?.trim() || email.split('@')[0] || 'User'
+      const mockProf = {
+        id: mockId,
+        app_uid: generateAppUid(),
+        username: cleanName.toLowerCase().replace(/[^a-z0-9_]/g, ''),
+        display_name: cleanName,
+        avatar_url: null,
+        email: email.trim()
+      }
+      setUser({ id: mockId, email: mockProf.email })
+      setProfile(mockProf)
+      localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(mockProf))
+      setIsAuthenticating(false)
+      return { success: true }
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: displayName?.trim() || email.split('@')[0]
+          }
+        }
+      })
+      if (error) throw error
+
+      if (data?.user && !data.session) {
+        setIsAuthenticating(false)
+        return { needsEmailConfirmation: true, email: email.trim() }
+      }
+
+      if (data?.user) {
+        setUser(data.user)
+        await fetchProfile(data.user)
+      }
+      setIsAuthenticating(false)
+      return { success: true, user: data.user }
+    } catch (err) {
+      console.error('Email sign up error:', err)
+      const message = err.message || 'Sign up failed'
+      setAuthError(message)
+      setIsAuthenticating(false)
+      return { error: message }
+    }
+  }
+
+  // Log out current user and clear local cache
   async function signOut() {
+    setIsAuthenticating(false)
+    setAuthError(null)
     if (!isSupabaseConfigured) {
       localStorage.removeItem(MOCK_STORAGE_KEY)
       setUser(null)
@@ -180,7 +368,7 @@ export function AuthProvider({ children }) {
     setProfile(null)
   }
 
-  // Update profile details (username, display_name)
+  // Update profile details (username, display name)
   async function updateProfile({ username, display_name }) {
     if (!profile) return { error: 'Not authenticated' }
 
@@ -228,8 +416,13 @@ export function AuthProvider({ children }) {
       user,
       profile,
       loading,
+      isAuthenticating,
+      authError,
+      clearAuthError,
       isSupabaseConfigured,
       signInWithGoogle,
+      signInWithEmail,
+      signUpWithEmail,
       signOut,
       updateProfile
     }}>
@@ -238,6 +431,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// Hook to access auth user, profile, and login methods
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

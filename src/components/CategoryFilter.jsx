@@ -3,6 +3,7 @@ import { CATEGORIES } from '../constants/categories'
 
 export { CATEGORIES }
 
+// Horizontal scrollable category filter buttons
 export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
   return (
     <nav

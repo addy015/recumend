@@ -1,38 +1,34 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { X, Save } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { CATEGORIES } from '../constants/categories'
 
+// Modal dialog allowing the creator of a recommendation to edit title, category, and notes
 export default function EditRecommendationModal({ item, isOpen, onClose }) {
   const { updateItem } = useItems()
 
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('movie')
-  const [customCategory, setCustomCategory] = useState('')
-  const [extra, setExtra] = useState('')
-  const [note, setNote] = useState('')
+  // Extract initial extra field depending on the category (channel link, author, or platform)
+  const getInitialExtra = () => {
+    if (!item) return ''
+    if (item.category === 'yt' || (item.category === 'app' && item.metadata?.channel_link)) {
+      return item.metadata?.channel_link || ''
+    } else if (item.category === 'book') {
+      return item.metadata?.author || ''
+    }
+    return item.metadata?.platform || ''
+  }
+
+  const [title, setTitle] = useState(item?.title || '')
+  const [category, setCategory] = useState(item?.category || 'movie')
+  const [customCategory, setCustomCategory] = useState(item?.metadata?.custom_category || '')
+  const [extra, setExtra] = useState(getInitialExtra)
+  const [note, setNote] = useState(item?.metadata?.note || '')
   const [status, setStatus] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    if (item) {
-      setTitle(item.title || '')
-      setCategory(item.category || 'movie')
-      setCustomCategory(item.metadata?.custom_category || '')
-      setNote(item.metadata?.note || '')
-      if (item.category === 'yt' || (item.category === 'app' && item.metadata?.channel_link)) {
-        setExtra(item.metadata?.channel_link || '')
-      } else if (item.category === 'book') {
-        setExtra(item.metadata?.author || '')
-      } else {
-        setExtra(item.metadata?.platform || '')
-      }
-      setStatus(null)
-    }
-  }, [item])
-
   if (!isOpen || !item) return null
 
+  // Save changes to the recommendation across the platform
   const handleSave = async (e) => {
     e.preventDefault()
     if (!title.trim()) {
@@ -48,6 +44,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
     setSubmitting(true)
     setStatus({ type: 'loading', msg: 'Updating recommendation globally...' })
 
+    // Clean up metadata based on active category
     const metadata = { ...item.metadata }
     if (category === 'other' && customCategory.trim()) {
       metadata.custom_category = customCategory.trim()

@@ -1,20 +1,22 @@
 import React, { useState } from 'react'
-import { Sparkles, Edit3, Trash2, ArrowBigUp, ExternalLink, Plus, AlertCircle, ShieldCheck } from 'lucide-react'
+import { Bookmark, Edit3, Trash2, ArrowBigUp, ExternalLink, Plus, AlertCircle, ShieldCheck, Heart } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
-import { useAuth } from '../context/AuthContext'
 import { CATEGORIES } from '../constants/categories'
 import { getSafeExternalLink } from '../lib/avatar'
 import EditRecommendationModal from './EditRecommendationModal'
 
+// User dashboard for managing personal created recommendations and upvoted items
 export default function MyRecommendations({ onOpenAddModal }) {
-  const { myItems, deleteItem } = useItems()
-  const { user } = useAuth()
+  const { myItems, upvotedItems = [], deleteItem, toggleRecommend } = useItems()
 
+  // Active sub-tab ('created' by me or 'upvoted' by me)
+  const [activeTab, setActiveTab] = useState('created') // 'created' | 'upvoted'
   const [editingItem, setEditingItem] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null)
   const [errorMessage, setErrorMessage] = useState(null)
 
+  // Permanently delete a recommendation created by this user
   const handleDelete = async (itemId) => {
     setDeletingId(itemId)
     setErrorMessage(null)
@@ -32,18 +34,15 @@ export default function MyRecommendations({ onOpenAddModal }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-zinc-900">
         <div>
           <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Sparkles className="w-4 sm:w-5 h-4 sm:h-5 text-emerald-400" />
+            <Bookmark className="w-4 sm:w-5 h-4 sm:h-5 text-emerald-400" />
             My Recommendations
           </h2>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Recommendations you personally added. Your vote is locked at +1. Edit or delete anytime.
+            Manage items you personally added or community recommendations you endorsed.
           </p>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto">
-          <div className="text-xs font-mono text-zinc-400 bg-zinc-900/60 border border-zinc-800/80 px-3 py-1.5 shrink-0">
-            <strong>{myItems.length}</strong> created
-          </div>
           <button
             onClick={onOpenAddModal}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors shadow-sm"
@@ -54,13 +53,72 @@ export default function MyRecommendations({ onOpenAddModal }) {
         </div>
       </div>
 
-      {/* Info notice about locked vote & global changes */}
-      <div className="p-3.5 bg-zinc-950/70 border border-zinc-800 flex items-start gap-2.5 text-xs text-zinc-400">
-        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-        <p className="leading-relaxed">
-          <strong className="text-zinc-200">Owner protection active:</strong> You cannot downvote your own recommendations — your vote stays locked at 1. Any edits or deletions you make here will update globally in the community feed.
-        </p>
+      {/* Error Alert */}
+      {errorMessage && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center justify-between gap-2 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMessage(null)}
+            className="text-rose-400 hover:text-rose-200 text-xs px-2 py-0.5 hover:bg-rose-500/20 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* 2 Tabs: Created & Upvoted */}
+      <div className="flex border-b border-zinc-800 gap-6">
+        <button
+          type="button"
+          onClick={() => setActiveTab('created')}
+          className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            activeTab === 'created'
+              ? 'border-emerald-400 text-white'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <span>Created</span>
+          <span className="font-mono text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-300">
+            {myItems.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('upvoted')}
+          className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
+            activeTab === 'upvoted'
+              ? 'border-emerald-400 text-white'
+              : 'border-transparent text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <span>Upvoted</span>
+          <span className="font-mono text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-300">
+            {upvotedItems.length}
+          </span>
+        </button>
       </div>
+
+      {/* Tab Context Info Notice */}
+      {activeTab === 'created' ? (
+        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800 flex items-start gap-2.5 text-xs text-zinc-400">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong className="text-zinc-200">Owner protection active:</strong> You cannot downvote your own recommendations — your vote stays locked at 1. Any edits or deletions you make here will update globally in the community feed.
+          </p>
+        </div>
+      ) : (
+        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800 flex items-start gap-2.5 text-xs text-zinc-400">
+          <Heart className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong className="text-zinc-200">Endorsements:</strong> Recommendations you upvoted from other community members. Click the upvote button anytime to remove your endorsement.
+          </p>
+        </div>
+      )}
 
       {errorMessage && (
         <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
@@ -69,116 +127,204 @@ export default function MyRecommendations({ onOpenAddModal }) {
         </div>
       )}
 
-      {/* List of User's Created Items */}
-      {myItems.length === 0 ? (
-        <div className="py-16 text-center bg-zinc-950/40 border border-zinc-800 p-8 space-y-3">
-          <Sparkles className="w-8 h-8 text-zinc-600 mx-auto" />
-          <p className="text-sm font-semibold text-zinc-300">You haven't added any recommendations yet</p>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            Recommend your favorite movies, anime, books, or YouTube channels to put them on the global leaderboard.
-          </p>
-          <button
-            onClick={onOpenAddModal}
-            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Your First Recommendation</span>
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {myItems.map((item) => (
-            <div
-              key={item.id}
-              className="bg-zinc-900/60 border border-zinc-800/80 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-zinc-700 transition-colors"
+      {/* TAB 1: CREATED ITEMS */}
+      {activeTab === 'created' && (
+        myItems.length === 0 ? (
+          <div className="py-16 text-center bg-zinc-950/40 border border-zinc-800 p-8 space-y-3">
+            <Bookmark className="w-8 h-8 text-zinc-600 mx-auto" />
+            <p className="text-sm font-semibold text-zinc-300">You haven't added any recommendations yet</p>
+            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              Recommend your favorite movies, anime, books, or YouTube channels to put them on the global leaderboard.
+            </p>
+            <button
+              onClick={onOpenAddModal}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors"
             >
-              {/* Item Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 bg-zinc-950 border border-zinc-800 text-zinc-400">
-                    {item.category === 'other' && item.metadata?.custom_category
-                      ? item.metadata.custom_category
-                      : CATEGORIES.find(c => c.id === item.category)?.label || item.category}
-                  </span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                    Locked at +1
-                  </span>
-                  {item.metadata?.year && (
-                    <span className="text-xs font-mono text-zinc-500">{item.metadata.year}</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Your First Recommendation</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {myItems.map((item) => (
+              <div
+                key={item.id}
+                className="bg-zinc-900/60 border border-zinc-800/80 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-zinc-700 transition-colors"
+              >
+                {/* Item Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 bg-zinc-950 border border-zinc-800 text-zinc-400">
+                      {item.category === 'other' && item.metadata?.custom_category
+                        ? item.metadata.custom_category
+                        : CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                    </span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                      Locked at +1
+                    </span>
+                    {item.metadata?.year && (
+                      <span className="text-xs font-mono text-zinc-500">{item.metadata.year}</span>
+                    )}
+                    {item.metadata?.author && (
+                      <span className="text-xs text-zinc-400 truncate">by {item.metadata.author}</span>
+                    )}
+                    {item.metadata?.platform && (
+                      <span className="text-xs text-zinc-500">• {item.metadata.platform}</span>
+                    )}
+                  </div>
+
+                  <h3 className="font-semibold text-sm sm:text-base text-zinc-100 break-words line-clamp-2">
+                    {item.title}
+                  </h3>
+
+                  {item.metadata?.note && (
+                    <p className="text-xs text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-zinc-800 pl-2.5 italic">
+                      "{item.metadata.note}"
+                    </p>
                   )}
-                  {item.metadata?.author && (
-                    <span className="text-xs text-zinc-400 truncate">by {item.metadata.author}</span>
-                  )}
-                  {item.metadata?.platform && (
-                    <span className="text-xs text-zinc-500">• {item.metadata.platform}</span>
+
+                  {getSafeExternalLink(item.metadata?.channel_link) && (
+                    <a
+                      href={getSafeExternalLink(item.metadata.channel_link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 hover:text-emerald-300 mt-1.5"
+                    >
+                      <span>Visit Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   )}
                 </div>
 
-                <h3 className="font-semibold text-sm sm:text-base text-zinc-100 break-words line-clamp-2">
-                  {item.title}
-                </h3>
+                {/* Vote Count & Action Buttons */}
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-zinc-800/60 sm:border-t-0">
+                  <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 px-2.5 sm:px-3 py-1.5 text-xs font-mono text-zinc-300">
+                    <ArrowBigUp className="w-4 h-4 fill-emerald-400 stroke-emerald-400" />
+                    <span className="font-bold">{item.recommend_count}</span>
+                    <span className="text-zinc-500 text-[11px]">votes</span>
+                  </div>
 
-                {item.metadata?.note && (
-                  <p className="text-xs text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-zinc-800 pl-2.5 italic">
-                    "{item.metadata.note}"
-                  </p>
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditingItem(item)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors border border-zinc-700/60"
+                      title="Edit recommendation details"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Edit</span>
+                    </button>
 
-                {getSafeExternalLink(item.metadata?.channel_link) && (
-                  <a
-                    href={getSafeExternalLink(item.metadata.channel_link)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 hover:text-emerald-300 mt-1.5"
-                  >
-                    <span>Visit Link</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
+                    <button
+                      onClick={() => setDeleteConfirmItem(item)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/30"
+                      title="Delete recommendation globally"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
               </div>
+            ))}
+          </div>
+        )
+      )}
 
-              {/* Vote Count & Action Buttons */}
-              <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-zinc-800/60 sm:border-t-0">
-                {/* Vote Indicator */}
-                <div className="flex items-center gap-1.5 bg-zinc-950 border border-zinc-800 px-2.5 sm:px-3 py-1.5 text-xs font-mono text-zinc-300">
-                  <ArrowBigUp className="w-4 h-4 fill-emerald-400 stroke-emerald-400" />
-                  <span className="font-bold">{item.recommend_count}</span>
-                  <span className="text-zinc-500 text-[11px]">votes</span>
+      {/* TAB 2: UPVOTED ITEMS */}
+      {activeTab === 'upvoted' && (
+        upvotedItems.length === 0 ? (
+          <div className="py-16 text-center bg-zinc-950/40 border border-zinc-800 p-8 space-y-3">
+            <Heart className="w-8 h-8 text-zinc-600 mx-auto" />
+            <p className="text-sm font-semibold text-zinc-300">No upvoted recommendations yet</p>
+            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+              Browse the community leaderboard and upvote things you love to build your endorsement list.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {upvotedItems.map((item) => (
+              <div
+                key={item.id}
+                className="bg-zinc-900/60 border border-zinc-800/80 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-zinc-700 transition-colors"
+              >
+                {/* Item Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                    <span className="text-[10px] uppercase font-mono tracking-wider px-1.5 py-0.5 bg-zinc-950 border border-zinc-800 text-zinc-400">
+                      {item.category === 'other' && item.metadata?.custom_category
+                        ? item.metadata.custom_category
+                        : CATEGORIES.find(c => c.id === item.category)?.label || item.category}
+                    </span>
+
+                    {item.creator?.username && (
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        by <strong className="text-zinc-400">@{item.creator.username}</strong>
+                      </span>
+                    )}
+
+                    {item.metadata?.year && (
+                      <span className="text-xs font-mono text-zinc-500">• {item.metadata.year}</span>
+                    )}
+                    {item.metadata?.author && (
+                      <span className="text-xs text-zinc-400 truncate">• {item.metadata.author}</span>
+                    )}
+                    {item.metadata?.platform && (
+                      <span className="text-xs text-zinc-500">• {item.metadata.platform}</span>
+                    )}
+                  </div>
+
+                  <h3 className="font-semibold text-sm sm:text-base text-zinc-100 break-words line-clamp-2">
+                    {item.title}
+                  </h3>
+
+                  {item.metadata?.note && (
+                    <p className="text-xs text-zinc-400 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-zinc-800 pl-2.5 italic">
+                      "{item.metadata.note}"
+                    </p>
+                  )}
+
+                  {getSafeExternalLink(item.metadata?.channel_link) && (
+                    <a
+                      href={getSafeExternalLink(item.metadata.channel_link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 hover:text-emerald-300 mt-1.5"
+                    >
+                      <span>Visit Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {/* Edit Button */}
+                {/* Upvote Toggle Button */}
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-zinc-800/60 sm:border-t-0">
                   <button
-                    onClick={() => setEditingItem(item)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition-colors border border-zinc-700/60"
-                    title="Edit recommendation details"
+                    type="button"
+                    onClick={() => toggleRecommend(item.id)}
+                    className="flex items-center gap-2 px-3 py-2 bg-emerald-500/15 hover:bg-rose-500/15 border border-emerald-500/30 hover:border-rose-500/30 text-emerald-400 hover:text-rose-400 text-xs font-mono transition-colors group cursor-pointer"
+                    title="Click to remove upvote"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Edit</span>
-                  </button>
-
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => setDeleteConfirmItem(item)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/30"
-                    title="Delete recommendation globally"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <ArrowBigUp className="w-4 h-4 fill-emerald-400 stroke-emerald-400 group-hover:fill-rose-400 group-hover:stroke-rose-400" />
+                    <span className="font-bold">{item.recommend_count}</span>
+                    <span className="text-[11px] group-hover:hidden">Upvoted</span>
+                    <span className="text-[11px] hidden group-hover:inline">Remove</span>
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )
       )}
 
       {/* Edit Modal */}
-      <EditRecommendationModal
-        item={editingItem}
-        isOpen={Boolean(editingItem)}
-        onClose={() => setEditingItem(null)}
-      />
+      {editingItem && (
+        <EditRecommendationModal
+          key={editingItem.id}
+          item={editingItem}
+          isOpen={Boolean(editingItem)}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmItem && (

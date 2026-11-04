@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { useItems } from "../context/ItemContext";
-import { useAuth } from "../context/AuthContext";
 import CategoryFilter from "./CategoryFilter";
 import ItemCard from "./ItemCard";
 
+// Global community leaderboard feed showing top recommended items
 export default function CommunityFeed({
   searchQuery,
   onOpenAddModal,
@@ -13,14 +13,16 @@ export default function CommunityFeed({
   const { items, loading: itemsLoading } = useItems();
   const [selectedCategory, setSelectedCategory] = useState("all");
 
-  // Filtered & Ranked Items (recommend_count >= 1)
+  // Filter items by category and search term, then sort by recommendations and date
   const filteredItems = useMemo(() => {
     let result = [...items];
 
+    // Filter by category tab
     if (selectedCategory !== "all") {
       result = result.filter((item) => item.category === selectedCategory);
     }
 
+    // Filter by search query across title, category, metadata, and creator
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((item) => {
@@ -28,20 +30,28 @@ export default function CommunityFeed({
 
         const matchTitle = item.title.toLowerCase().includes(q);
         const matchCategory = item.category.toLowerCase().includes(q);
+        const matchCustomCat = item.metadata?.custom_category?.toLowerCase().includes(q);
         const matchNote = item.metadata?.note?.toLowerCase().includes(q);
         const matchAuthor = item.metadata?.author?.toLowerCase().includes(q);
+        const matchPlatform = item.metadata?.platform?.toLowerCase().includes(q);
+        const matchCreator = item.creator?.username?.toLowerCase().includes(q) ||
+          item.creator?.display_name?.toLowerCase().includes(q);
 
-        return matchTitle || matchCategory || matchNote || matchAuthor;
+        return matchTitle || matchCategory || matchCustomCat || matchNote || matchAuthor || matchPlatform || matchCreator;
       });
     }
 
-    result.sort((a, b) => b.recommend_count - a.recommend_count);
+    // Rank items: highest vote count first, ties broken by earliest submission
+    result.sort((a, b) => {
+      const diff = b.recommend_count - a.recommend_count;
+      if (diff !== 0) return diff;
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
     return result;
   }, [items, selectedCategory, searchQuery]);
-
-  const totalRecommendationsCount = useMemo(() => {
-    return items.reduce((acc, it) => acc + (it.recommend_count || 0), 0);
-  }, [items]);
 
   return (
     <div className="space-y-6">

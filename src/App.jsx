@@ -1,30 +1,29 @@
 import React, { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ItemProvider, useItems } from './context/ItemContext'
-import { supabase } from './lib/supabase'
 import Navbar from './components/Navbar'
 import CommunityFeed from './components/CommunityFeed'
 import MyRecommendations from './components/MyRecommendations'
 import AddRecommendationModal from './components/AddRecommendationModal'
 import SettingsModal from './components/SettingsModal'
-import ConnectSupabaseModal from './components/ConnectSupabaseModal'
 import UserProfileView from './components/UserProfileView'
-import { TrendingUp, Sparkles, Database } from 'lucide-react'
+import { TrendingUp, Bookmark } from 'lucide-react'
 
+// Main layout component managing active tabs, modals, and URL routing
 function MainContent() {
-  const { myItems, items } = useItems()
-  const { user, profile, signInWithGoogle, isSupabaseConfigured } = useAuth()
+  const { myItems, upvotedItems = [] } = useItems()
+  const { user, profile, signInWithGoogle } = useAuth()
 
+  // Navigation and search state
   const [activeTab, setActiveTab] = useState('feed') // 'feed' | 'my-recs'
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Modals & Navigation state
+  // Modal open states and currently viewed profile handle
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
-  const [isConnectSupabaseModalOpen, setIsConnectSupabaseModalOpen] = useState(false)
   const [viewingUsername, setViewingUsername] = useState(null)
 
-  // Direct public profile route (/u/:username)
+  // Listen for hash route changes (e.g. #/u/:username)
   useEffect(() => {
     function checkHash() {
       const hash = window.location.hash
@@ -41,6 +40,7 @@ function MainContent() {
     return () => window.removeEventListener('hashchange', checkHash)
   }, [])
 
+  // Open add modal or prompt Google login if guest
   const handleOpenAddModal = () => {
     if (!user) {
       signInWithGoogle()
@@ -61,7 +61,6 @@ function MainContent() {
           setViewingUsername(null)
           setActiveTab(tab)
         }}
-        onOpenAddModal={handleOpenAddModal}
         onOpenProfileModal={() => {
           if (profile?.username) {
             window.location.hash = `/u/${profile.username}`
@@ -69,7 +68,6 @@ function MainContent() {
           }
         }}
         onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
-        onOpenSupabaseModal={() => setIsConnectSupabaseModalOpen(true)}
         onSelectUser={(u) => {
           if (u?.username) {
             window.location.hash = `/u/${u.username}`
@@ -96,37 +94,6 @@ function MainContent() {
           />
         ) : (
           <>
-            {/* Supabase status indicator banner */}
-            {!isSupabaseConfigured ? (
-              <div className="p-3.5 bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2 h-2 bg-amber-400 shrink-0"></span>
-                  <span>Running in Demo / LocalStorage Mode. Connect your Supabase project for live database & auth.</span>
-                </div>
-                <button
-                  onClick={() => setIsConnectSupabaseModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shrink-0 transition-colors"
-                >
-                  <Database className="w-3.5 h-3.5" />
-                  <span>Connect Supabase</span>
-                </button>
-              </div>
-            ) : (
-              <div className="p-2.5 px-3.5 bg-zinc-900/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-emerald-400 shrink-0"></span>
-                  <span className="text-zinc-300 font-medium">Supabase Backend Connected</span>
-                  <span className="text-zinc-500 hidden sm:inline">• Live PostgreSQL database & Auth active</span>
-                </div>
-                <button
-                  onClick={() => setIsConnectSupabaseModalOpen(true)}
-                  className="text-zinc-400 hover:text-white underline text-[11px]"
-                >
-                  Manage Connection
-                </button>
-              </div>
-            )}
-
             {/* Tab Switcher */}
             <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
               <button
@@ -155,11 +122,11 @@ function MainContent() {
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <Bookmark className="w-4 h-4 text-emerald-400" />
                 <span>My Recommendations</span>
                 {user && (
                   <span className="px-1.5 py-0.5 text-[10px] font-mono bg-zinc-800 text-zinc-300">
-                    {myItems.length}
+                    {myItems.length + (upvotedItems?.length || 0)}
                   </span>
                 )}
               </button>
@@ -185,22 +152,27 @@ function MainContent() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-900 mt-auto py-6 text-center text-xs text-zinc-600 font-mono">
-        recumend • minimal dark community curation
+      <footer className="border-t border-zinc-900 mt-auto py-8 px-4 font-mono">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-zinc-200">recumend</span>
+            <span className="text-zinc-700">•</span>
+            <span className="text-zinc-400">only human taste</span>
+          </div>
+          <div className="text-[11px] text-zinc-500">
+           Life's too short for mid consumption
+          </div>
+        </div>
       </footer>
 
       {/* Modals */}
-      <ConnectSupabaseModal
-        isOpen={isConnectSupabaseModalOpen}
-        onClose={() => setIsConnectSupabaseModalOpen(false)}
-      />
-
       <AddRecommendationModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
       />
 
       <SettingsModal
+        key={profile?.id ? `${profile.id}-${profile.username}` : 'settings-modal'}
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
       />
@@ -208,6 +180,7 @@ function MainContent() {
   )
 }
 
+// Root application component wrapping auth and item providers
 export default function App() {
   return (
     <AuthProvider>

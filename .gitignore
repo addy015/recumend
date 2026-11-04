@@ -59,7 +59,16 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# Project tooling & Vercel
+# Project tooling & AI
 graphify-out/
-.vercel/
+.claude/
+.gemini/
+.antigravity/
 
+# Scratch & Dev Notes
+CurrentIssue.md
+Features.md
+feature*.md
+
+# Vercel
+.vercel/

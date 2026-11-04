@@ -1,3 +1,4 @@
+// Seed users used for local demo preview when Supabase is not connected
 export const KNOWN_USERS = {
   'demo-user-123': {
     id: 'demo-user-123',
@@ -21,3 +22,4 @@ export const KNOWN_USERS = {
     avatar_url: null,
   },
 }
+

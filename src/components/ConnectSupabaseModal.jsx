@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { X, Database, Check, Copy, ExternalLink, AlertCircle, Key, Globe, ShieldCheck } from 'lucide-react'
-import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey, saveSupabaseConfig, clearSupabaseConfig } from '../lib/supabase'
+import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey, saveSupabaseConfig, clearSupabaseConfig, hasValidEnv, isProduction } from '../lib/supabase'
 
 const SQL_SCHEMA = `-- Recumend: Initial PostgreSQL Schema for Supabase
 
@@ -33,6 +33,7 @@ create table if not exists public.items (
 );
 
 create index if not exists idx_items_recommend_count on public.items (recommend_count desc);
+create index if not exists idx_items_recommend_count_created on public.items (recommend_count desc, created_at asc);
 create index if not exists idx_items_category on public.items (category);
 create index if not exists idx_items_normalized_title on public.items (normalized_title);
 
@@ -108,6 +109,7 @@ alter publication supabase_realtime add table public.items;
 alter publication supabase_realtime add table public.recommendations;
 `
 
+// Modal dialog helping users configure their Supabase backend connection and run schema migrations
 export default function ConnectSupabaseModal({ isOpen, onClose }) {
   const [url, setUrl] = useState(supabaseUrl || '')
   const [anonKey, setAnonKey] = useState(supabaseAnonKey || '')
@@ -116,12 +118,14 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
 
   if (!isOpen) return null
 
+  // Copy full SQL migration script to clipboard
   const handleCopySql = () => {
     navigator.clipboard.writeText(SQL_SCHEMA)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Validate URL and key, then store in localStorage and reload page
   const handleSave = (e) => {
     e.preventDefault()
     setErrorMsg(null)
@@ -142,6 +146,7 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
     saveSupabaseConfig(cleanUrl, cleanKey)
   }
 
+  // Disconnect from Supabase and switch back to offline demo data
   const handleResetToDemo = () => {
     clearSupabaseConfig()
   }
@@ -232,60 +237,71 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
           </div>
         )}
 
-        {/* Credentials Form */}
-        <form onSubmit={handleSave} className="space-y-3">
-          <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-              Project URL (<code className="text-emerald-400 font-mono">VITE_SUPABASE_URL</code>)
-            </label>
-            <div className="relative">
-              <Globe className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="url"
-                required
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://xyzcompany.supabase.co"
-                className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
-              />
+        {hasValidEnv && isProduction ? (
+          <div className="p-4 bg-zinc-950 border border-zinc-800 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+              <ShieldCheck className="w-4 h-4" />
+              <span>Production Credentials Locked</span>
             </div>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Database connection is securely managed via hosting environment variables (<code className="text-zinc-300 font-mono">VITE_SUPABASE_URL</code>). In-browser modifications and demo fallback are disabled.
+            </p>
           </div>
-
-          <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-              Anon / Public API Key (<code className="text-emerald-400 font-mono">VITE_SUPABASE_ANON_KEY</code>)
-            </label>
-            <div className="relative">
-              <Key className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                required
-                value={anonKey}
-                onChange={(e) => setAnonKey(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
-              />
+        ) : (
+          <form onSubmit={handleSave} className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                Project URL (<code className="text-emerald-400 font-mono">VITE_SUPABASE_URL</code>)
+              </label>
+              <div className="relative">
+                <Globe className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="url"
+                  required
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://xyzcompany.supabase.co"
+                  className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <button
-              type="submit"
-              className="flex-1 py-2 px-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold transition-colors shadow-sm"
-            >
-              Save & Connect
-            </button>
-            {isSupabaseConfigured && (
+            <div>
+              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                Anon / Public API Key (<code className="text-emerald-400 font-mono">VITE_SUPABASE_ANON_KEY</code>)
+              </label>
+              <div className="relative">
+                <Key className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  required
+                  value={anonKey}
+                  onChange={(e) => setAnonKey(e.target.value)}
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
               <button
-                type="button"
-                onClick={handleResetToDemo}
-                className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors border border-zinc-700/60"
+                type="submit"
+                className="flex-1 py-2 px-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold transition-colors shadow-sm"
               >
-                Reset to Demo
+                Save & Connect
               </button>
-            )}
-          </div>
-        </form>
+              {isSupabaseConfigured && (
+                <button
+                  type="button"
+                  onClick={handleResetToDemo}
+                  className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors border border-zinc-700/60"
+                >
+                  Reset to Demo
+                </button>
+              )}
+            </div>
+          </form>
+        )}
 
         <p className="text-[11px] text-zinc-500 text-center">
           Credentials can also be stored in <code className="font-mono text-zinc-400">.env</code> in the project root.
@@ -294,3 +310,4 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
     </div>
   )
 }
+

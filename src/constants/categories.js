@@ -1,5 +1,6 @@
 import { Film, Tv, PlaySquare, BookOpen, Gamepad2, Video, Clapperboard, Layers, Globe, MoreHorizontal } from 'lucide-react'
 
+// Supported recommendation categories, labels, and their matching icons
 export const CATEGORIES = [
   { id: 'all', label: 'All', icon: Layers },
   { id: 'movie', label: 'Movies', icon: Film },
@@ -12,3 +13,4 @@ export const CATEGORIES = [
   { id: 'app', label: 'App/Website', icon: Globe },
   { id: 'other', label: 'Others', icon: MoreHorizontal },
 ]
+

@@ -1,11 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Scan HTML and React components for Tailwind classes
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   darkMode: 'class',
   theme: {
+    // Sharp edges everywhere (no rounded corners)
     borderRadius: {
       none: '0px',
       sm: '0px',
@@ -18,6 +20,7 @@ export default {
       full: '0px',
     },
     extend: {
+      // Dark zinc palette for UI background, cards, and borders
       colors: {
         dark: {
           bg: "#09090b",       // zinc-950

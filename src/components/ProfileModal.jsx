@@ -4,12 +4,13 @@ import { useItems } from '../context/ItemContext'
 import { getAvatarUrl } from '../lib/avatar'
 import ItemCard from './ItemCard'
 
+// Pop-up modal displaying a user's profile details and recommendations
 export default function ProfileModal({ profileData, isOpen, onClose }) {
   const { items } = useItems()
 
   if (!isOpen || !profileData) return null
 
-  // Items added by this user
+  // Filter recommendations created by this specific user
   const userItems = items.filter(it => it.created_by === profileData.id || it.creator?.username === profileData.username)
 
   return (

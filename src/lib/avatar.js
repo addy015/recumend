@@ -5,6 +5,7 @@
  * If no picture exists or URL fails, returns an initials avatar (dark zinc + emerald text).
  */
 export function getAvatarUrl(avatarUrl, name = 'User') {
+  // Use existing avatar if valid and not a stock image
   if (
     avatarUrl &&
     typeof avatarUrl === 'string' &&
@@ -14,6 +15,7 @@ export function getAvatarUrl(avatarUrl, name = 'User') {
     return avatarUrl
   }
 
+  // Fallback to generated initials avatar
   const cleanName = encodeURIComponent((name || 'User').trim() || 'User')
   return `https://ui-avatars.com/api/?name=${cleanName}&background=27272a&color=34d399&bold=true&size=128`
 }
@@ -24,6 +26,7 @@ export function getAvatarUrl(avatarUrl, name = 'User') {
 export function getSafeExternalLink(url) {
   if (!url || typeof url !== 'string') return null
   const trimmed = url.trim()
+  // Only permit valid http or https protocols
   if (/^https?:\/\//i.test(trimmed)) return trimmed
   return null
 }

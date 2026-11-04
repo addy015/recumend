@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Share2, Award, Calendar, ExternalLink, Check } from 'lucide-react'
+import { ArrowLeft, Share2, Award, Check } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useItems } from '../context/ItemContext'
 import { getAvatarUrl } from '../lib/avatar'
 import ItemCard from './ItemCard'
 
+// Public user profile page showing curated recommendations for #/u/:username
 export default function UserProfileView({ username, onBack, onSelectUser }) {
   const { items } = useItems()
   const [profile, setProfile] = useState(null)
@@ -12,6 +13,12 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
 
+  const itemsRef = React.useRef(items)
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
+
+  // Fetch target user's profile information
   useEffect(() => {
     async function loadUserProfile() {
       setLoading(true)
@@ -20,7 +27,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
       try {
         if (!isSupabaseConfigured) {
           // Demo fallback: search in items
-          const found = items.find(it => it.creator?.username === username)
+          const found = itemsRef.current.find(it => it.creator?.username === username)
           if (found?.creator) {
             setProfile(found.creator)
           } else {
@@ -60,7 +67,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
     if (username) {
       loadUserProfile()
     }
-  }, [username, isSupabaseConfigured, items])
+  }, [username])
 
   // Get all items created by or attributed to this user
   const userItems = items.filter(it => {
@@ -68,6 +75,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
     return it.created_by === profile.id || it.creator?.username === profile.username
   })
 
+  // Copy current profile URL to clipboard
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href)
     setCopied(true)
@@ -169,9 +177,6 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
                   @{profile.username}
                 </span>
               </div>
-              <p className="font-mono text-[11px] text-zinc-500 mt-1 truncate">
-                App ID: <span className="text-zinc-400 select-all">{profile.app_uid}</span>
-              </p>
             </div>
           </div>
 

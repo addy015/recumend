@@ -1,13 +1,15 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 
+// Recommendation items and votes context
 const ItemContext = createContext(null)
 
+// Storage keys for offline demo mode
 const LOCAL_ITEMS_KEY = 'recumend_items_data'
 const LOCAL_RECS_KEY = 'recumend_user_recs'
 
-// Realistic initial seed data for immediate demonstration
+// Default seed recommendations shown in demo mode
 const INITIAL_ITEMS = [
   {
     id: 'item-1',
@@ -77,6 +79,7 @@ const INITIAL_ITEMS = [
   }
 ]
 
+// Provider managing recommendations, user votes, and real-time feed updates
 export function ItemProvider({ children }) {
   const { user, profile } = useAuth()
   const [items, setItems] = useState([])
@@ -84,43 +87,46 @@ export function ItemProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const votingInProgress = useRef(new Set())
 
-  // Load items
+  // Load items on mount (either from localStorage or Supabase database)
   useEffect(() => {
     async function loadData() {
       if (!isSupabaseConfigured) {
-        // LocalStorage fallback
+        // Fallback to localStorage in offline demo mode
         const savedItems = localStorage.getItem(LOCAL_ITEMS_KEY)
         let initial = savedItems ? JSON.parse(savedItems) : INITIAL_ITEMS
 
         setItems(initial)
 
-        const savedRecs = localStorage.getItem(LOCAL_RECS_KEY)
-        const recsSet = new Set(
-          savedRecs
-            ? JSON.parse(savedRecs)
-            : (user?.id ? ['item-1', 'item-3', 'item-5'] : [])
-        )
-        // Ensure all items created by the user are always recommended by them
         if (user?.id) {
+          const savedRecs = localStorage.getItem(LOCAL_RECS_KEY)
+          const recsSet = new Set(
+            savedRecs
+              ? JSON.parse(savedRecs)
+              : ['item-1', 'item-3', 'item-5']
+          )
+          // Ensure all items created by the user are always recommended by them
           initial.forEach(it => {
             if (it.created_by === user.id) {
               recsSet.add(it.id)
             }
           })
+          setUserRecs(recsSet)
+          localStorage.setItem(LOCAL_RECS_KEY, JSON.stringify([...recsSet]))
+        } else {
+          setUserRecs(new Set())
         }
-        setUserRecs(recsSet)
-        localStorage.setItem(LOCAL_RECS_KEY, JSON.stringify([...recsSet]))
         setLoading(false)
         return
       }
 
-      // Supabase fetch
+      // Fetch items and current user's upvotes from Supabase
       try {
         const { data: dbItems, error: _err } = await supabase
           .from('items')
           .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
           .gte('recommend_count', 1)
           .order('recommend_count', { ascending: false })
+          .order('created_at', { ascending: true })
 
         if (dbItems) {
           setItems(dbItems)
@@ -141,6 +147,8 @@ export function ItemProvider({ children }) {
             })
           }
           setUserRecs(recSet)
+        } else {
+          setUserRecs(new Set())
         }
       } catch (err) {
         console.error('Failed to load items from Supabase:', err)
@@ -150,12 +158,12 @@ export function ItemProvider({ children }) {
     }
 
     loadData()
-  }, [user?.id, profile])
+  }, [user?.id, profile?.id])
 
-  // Realtime subscription for live community updates (Supabase + LocalStorage cross-tab)
+  // Realtime subscription for live item changes across tabs or Supabase channels
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      // Cross-tab synchronization for LocalStorage
+      // Sync state across browser tabs when using localStorage
       const handleStorageChange = (e) => {
         if (e.key === LOCAL_ITEMS_KEY && e.newValue) {
           try {
@@ -177,7 +185,7 @@ export function ItemProvider({ children }) {
       return () => window.removeEventListener('storage', handleStorageChange)
     }
 
-    // Supabase Realtime channel for postgres_changes on items
+    // Subscribe to database changes (inserts, updates, deletes)
     const channel = supabase
       .channel('realtime_community_feed')
       .on(
@@ -185,43 +193,62 @@ export function ItemProvider({ children }) {
         { event: 'INSERT', schema: 'public', table: 'items' },
         async (payload) => {
           const newItem = payload.new
-          if (newItem) {
-            let creatorData = null
-            if (newItem.created_by) {
-              const { data: p } = await supabase
-                .from('profiles')
-                .select('id, username, display_name, avatar_url, app_uid')
-                .eq('id', newItem.created_by)
-                .single()
-              creatorData = p
-            }
-            const itemWithCreator = { ...newItem, creator: creatorData }
-            setItems((prev) => {
-              if (prev.some((it) => it.id === newItem.id)) {
-                return prev.map(it => it.id === newItem.id ? { ...it, ...itemWithCreator } : it)
-              }
-              return [itemWithCreator, ...prev]
-            })
+          // Don't add items with recommend_count < 1 (intermediate state before initial recommendation trigger)
+          if (!newItem || newItem.recommend_count < 1) return
+
+          let creatorData = null
+          if (newItem.created_by) {
+            const { data: p } = await supabase
+              .from('profiles')
+              .select('id, username, display_name, avatar_url, app_uid')
+              .eq('id', newItem.created_by)
+              .single()
+            creatorData = p
           }
+          const itemWithCreator = { ...newItem, creator: creatorData }
+          setItems((prev) => {
+            if (prev.some((it) => it.id === newItem.id)) {
+              return prev.map(it => it.id === newItem.id ? {
+                ...it,
+                ...itemWithCreator,
+                recommend_count: Math.max(it.recommend_count, itemWithCreator.recommend_count),
+                creator: itemWithCreator.creator || it.creator
+              } : it)
+            }
+            return [itemWithCreator, ...prev]
+          })
         }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'items' },
-        (payload) => {
+        async (payload) => {
           const updated = payload.new
           if (updated) {
-            setItems((prev) => {
-              const existing = prev.find((it) => it.id === updated.id)
-              const merged = { ...updated, creator: existing?.creator || null }
-              if (existing) {
-                return prev.map((it) => (it.id === updated.id ? merged : it))
-              }
-              if (updated.recommend_count >= 1) {
+            if (updated.recommend_count >= 1) {
+              setItems((prev) => {
+                const existing = prev.find((it) => it.id === updated.id)
+                const merged = { ...updated, creator: existing?.creator || null }
+                if (existing) {
+                  return prev.map((it) => (it.id === updated.id ? merged : it))
+                }
                 return [merged, ...prev]
+              })
+
+              // Fetch creator profile if not already attached
+              if (updated.created_by) {
+                const { data: p } = await supabase
+                  .from('profiles')
+                  .select('id, username, display_name, avatar_url, app_uid')
+                  .eq('id', updated.created_by)
+                  .single()
+                if (p) {
+                  setItems((prev) => prev.map((it) => (it.id === updated.id ? { ...it, creator: p } : it)))
+                }
               }
-              return prev
-            })
+            } else {
+              setItems((prev) => prev.filter((it) => it.id !== updated.id))
+            }
           }
         }
       )
@@ -240,9 +267,9 @@ export function ItemProvider({ children }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [isSupabaseConfigured])
+  }, [])
 
-  // Normalize string for consistent dedup
+  // Strip punctuation and normalize whitespace for duplicate detection
   function normalizeTitle(str) {
     return str
       .trim()
@@ -251,24 +278,25 @@ export function ItemProvider({ children }) {
       .replace(/\s+/g, ' ')
   }
 
-  // Toggle recommendation (+1 / -1)
+  // Upvote or remove upvote for an item (+1 / -1)
   async function toggleRecommend(itemId) {
     if (!user) {
       return { error: 'Please sign in to recommend items' }
     }
 
+    // Prevent duplicate rapid clicks while request is in flight
     if (votingInProgress.current.has(itemId)) {
       return { inProgress: true }
     }
     votingInProgress.current.add(itemId)
 
     try {
-      // Check if user is the owner/creator of the item
+      // Check if user is the original creator
       const targetItem = items.find(it => it.id === itemId)
       const isOwner = targetItem && targetItem.created_by === user.id
       const isCurrentlyRecommended = userRecs.has(itemId)
 
-      // User cannot downvote or remove recommendation from their own item
+      // Creator's recommendation is locked at 1
       if (isOwner && isCurrentlyRecommended) {
         return {
           error: 'You recommended this item when creating it (locked at 1). Manage or delete it in My Recommendations.',
@@ -277,7 +305,7 @@ export function ItemProvider({ children }) {
       }
 
       if (!isSupabaseConfigured) {
-        // Local state update
+        // Local state update for demo mode
         const updatedRecs = new Set(userRecs)
         if (isCurrentlyRecommended) {
           updatedRecs.delete(itemId)
@@ -303,48 +331,66 @@ export function ItemProvider({ children }) {
         return { success: true }
       }
 
-      // Real Supabase vote
+      // Optimistically update vote count in state before database response
+      const previousRecs = new Set(userRecs)
+      const previousItems = items
+
+      const nextRecs = new Set(userRecs)
       if (isCurrentlyRecommended) {
-        // Delete recommendation
-        await supabase
-          .from('recommendations')
-          .delete()
-          .match({ user_id: user.id, item_id: itemId })
-
-        setUserRecs(prev => {
-          const next = new Set(prev)
-          next.delete(itemId)
-          return next
-        })
+        nextRecs.delete(itemId)
       } else {
-        // Insert recommendation
-        await supabase
-          .from('recommendations')
-          .insert({ user_id: user.id, item_id: itemId })
-
-        setUserRecs(prev => new Set(prev).add(itemId))
+        nextRecs.add(itemId)
       }
+      setUserRecs(nextRecs)
+      setItems(prevItems => prevItems.map(item => {
+        if (item.id === itemId) {
+          const delta = isCurrentlyRecommended ? -1 : 1
+          return { ...item, recommend_count: Math.max(0, (item.recommend_count || 0) + delta) }
+        }
+        return item
+      }))
 
-      // Re-fetch items to get accurate trigger count
-      const { data: dbItems } = await supabase
-        .from('items')
-        .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
-        .gte('recommend_count', 1)
-        .order('recommend_count', { ascending: false })
+      try {
+        if (isCurrentlyRecommended) {
+          const { error: delErr } = await supabase
+            .from('recommendations')
+            .delete()
+            .match({ user_id: user.id, item_id: itemId })
+          if (delErr) throw delErr
+        } else {
+          const { error: insErr } = await supabase
+            .from('recommendations')
+            .insert({ user_id: user.id, item_id: itemId })
+          if (insErr) throw insErr
+        }
 
-      if (dbItems) {
-        setItems(dbItems)
+        // Background sync to ensure DB trigger count is exact
+        const { data: dbItems } = await supabase
+          .from('items')
+          .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+          .gte('recommend_count', 1)
+          .order('recommend_count', { ascending: false })
+          .order('created_at', { ascending: true })
+
+        if (dbItems) {
+          setItems(dbItems)
+        }
+        return { success: true }
+      } catch (opErr) {
+        // Rollback on failure
+        setUserRecs(previousRecs)
+        setItems(previousItems)
+        throw opErr
       }
-      return { success: true }
     } catch (err) {
       console.error('Toggle error:', err)
-      return { error: err.message }
+      return { error: err.message || 'Failed to update recommendation' }
     } finally {
       votingInProgress.current.delete(itemId)
     }
   }
 
-  // Add new item with deduplication
+  // Add a new recommendation with deduplication checks
   async function addItem({ title, category, metadata = {} }) {
     if (!user) return { error: 'Must be logged in' }
 
@@ -365,16 +411,12 @@ export function ItemProvider({ children }) {
     const norm = normalizeTitle(cleanTitle)
     if (!norm) return { error: 'Invalid title characters' }
 
-    // Check if item exists in this category
+    // Check if item already exists in this category
     const existing = items.find(
       it => it.normalized_title === norm && it.category === category
     )
 
     if (existing) {
-      // Item exists: auto-recommend it if not already recommended
-      if (!userRecs.has(existing.id)) {
-        await toggleRecommend(existing.id)
-      }
       return { exists: true, item: existing }
     }
 
@@ -444,16 +486,43 @@ export function ItemProvider({ children }) {
           app_uid: profile.app_uid
         } : null
       }
-      setItems(prev => [finalItem, ...prev])
+      setItems(prev => [finalItem, ...prev.filter(it => it.id !== finalItem.id)])
       setUserRecs(prev => new Set(prev).add(createdItem.id))
+
+      // Authoritative Supabase re-fetch to ensure trigger sync and exact ranking order
+      try {
+        const { data: dbItems } = await supabase
+          .from('items')
+          .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+          .gte('recommend_count', 1)
+          .order('recommend_count', { ascending: false })
+          .order('created_at', { ascending: true })
+
+        if (dbItems && dbItems.length > 0) {
+          setItems(dbItems)
+        }
+      } catch (refetchErr) {
+        console.warn('Post-add refetch warning:', refetchErr)
+      }
+
       return { success: true, item: finalItem }
     } catch (err) {
       console.error('Add item error:', err)
-      return { error: err.message }
+      let msg = err.message || 'Failed to add recommendation'
+      if (err.code === '23505' || err.message?.includes('unique_item_category') || err.message?.includes('duplicate key')) {
+        const existingItem = items.find(it => it.normalized_title === norm && it.category === category)
+        if (existingItem) {
+          return { exists: true, item: existingItem }
+        }
+        msg = `"${cleanTitle}" has already been recommended in this category.`
+      } else if (err.message?.includes('Rate limit')) {
+        msg = 'Please wait a few seconds before adding another recommendation.'
+      }
+      return { error: msg }
     }
   }
 
-  // Update item globally (Owner only)
+  // Update item details (creator only)
   async function updateItem(itemId, { title, category, metadata = {} }) {
     if (!user) return { error: 'Must be logged in to edit' }
 
@@ -495,20 +564,27 @@ export function ItemProvider({ children }) {
         })
         .eq('id', itemId)
         .eq('created_by', user.id)
-        .select()
+        .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
         .single()
 
       if (error) throw error
 
-      setItems(prev => prev.map(it => (it.id === itemId ? data : it)))
-      return { success: true, item: data }
+      const existing = items.find(it => it.id === itemId)
+      const merged = { ...data, creator: data.creator || existing?.creator || null }
+
+      setItems(prev => prev.map(it => (it.id === itemId ? merged : it)))
+      return { success: true, item: merged }
     } catch (err) {
       console.error('Update item error:', err)
-      return { error: err.message }
+      let msg = err.message || 'Failed to update item'
+      if (err.code === '23505' || err.message?.includes('unique_item_category') || err.message?.includes('duplicate key')) {
+        msg = `An item titled "${cleanTitle}" already exists in this category.`
+      }
+      return { error: msg }
     }
   }
 
-  // Delete item globally (Owner only)
+  // Delete item globally (creator only)
   async function deleteItem(itemId) {
     if (!user) return { error: 'Must be logged in to delete' }
 
@@ -551,17 +627,42 @@ export function ItemProvider({ children }) {
     }
   }
 
+  // Attach up-to-date user profile to items created by the logged-in user
+  const enrichedItems = useMemo(() => {
+    if (!profile?.id) return items
+    return items.map((it) => {
+      if (it.created_by === profile.id) {
+        return {
+          ...it,
+          creator: {
+            ...it.creator,
+            id: profile.id,
+            username: profile.username,
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+            app_uid: profile.app_uid
+          }
+        }
+      }
+      return it
+    })
+  }, [items, profile])
+
   // Active items filter: MUST have recommend_count >= 1
-  const activeItems = items.filter(it => it.recommend_count >= 1)
+  const activeItems = useMemo(() => enrichedItems.filter(it => it.recommend_count >= 1), [enrichedItems])
 
   // Items created by currently logged-in user
-  const myItems = items.filter(it => Boolean(user?.id && it.created_by === user.id))
+  const myItems = useMemo(() => enrichedItems.filter(it => Boolean(user?.id && it.created_by === user.id)), [enrichedItems, user])
+
+  // Items upvoted by user (excluding items they created)
+  const upvotedItems = useMemo(() => enrichedItems.filter(it => Boolean(user?.id && userRecs.has(it.id) && it.created_by !== user.id)), [enrichedItems, user, userRecs])
 
   return (
     <ItemContext.Provider value={{
       items: activeItems,
       rawItems: items,
       myItems,
+      upvotedItems,
       userRecs,
       loading,
       toggleRecommend,
@@ -575,6 +676,7 @@ export function ItemProvider({ children }) {
   )
 }
 
+// Hook to access recommendations list and vote actions
 export function useItems() {
   const ctx = useContext(ItemContext)
   if (!ctx) throw new Error('useItems must be used within ItemProvider')

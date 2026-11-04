@@ -5,13 +5,16 @@ import { useAuth } from '../context/AuthContext'
 import { CATEGORIES } from '../constants/categories'
 import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
 
+// Individual recommendation card showing rank, title, creator, and upvote button
 export default function ItemCard({ item, rank, onSelectUser }) {
   const { userRecs, toggleRecommend } = useItems()
   const { user, signInWithGoogle } = useAuth()
 
+  // The creator's upvote is permanently locked at +1
   const isOwner = Boolean(user?.id && item.created_by === user.id)
   const isRecommended = isOwner || userRecs.has(item.id)
 
+  // Toggle upvote or prompt login for visitors
   const handleVote = () => {
     if (!user) {
       signInWithGoogle()
@@ -21,6 +24,7 @@ export default function ItemCard({ item, rank, onSelectUser }) {
     toggleRecommend(item.id)
   }
 
+  // Resolve display category label (including custom labels for 'other')
   const categoryObj = CATEGORIES.find(c => c.id === item.category)
   const displayCategory = item.category === 'other' && item.metadata?.custom_category
     ? item.metadata.custom_category

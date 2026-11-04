@@ -29,6 +29,7 @@ create table if not exists public.items (
 );
 
 create index if not exists idx_items_recommend_count on public.items (recommend_count desc);
+create index if not exists idx_items_recommend_count_created on public.items (recommend_count desc, created_at asc);
 create index if not exists idx_items_category on public.items (category);
 create index if not exists idx_items_normalized_title on public.items (normalized_title);
 
