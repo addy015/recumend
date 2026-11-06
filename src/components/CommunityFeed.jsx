@@ -55,7 +55,6 @@ export default function CommunityFeed({
 
   return (
     <div className="space-y-6">
-
       {/* Category Filter Chips */}
       <CategoryFilter
         selectedCategory={selectedCategory}
@@ -63,25 +62,26 @@ export default function CommunityFeed({
       />
 
       {/* Items Ranking Feed */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {itemsLoading ? (
-          <div className="py-16 text-center text-xs font-mono text-zinc-500">
+          <div className="py-16 text-center text-xs font-mono text-stone-500">
             Loading rankings...
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="py-16 text-center bg-zinc-950/40 border border-zinc-800 p-8 space-y-3">
-            <Search className="w-8 h-8 text-zinc-600 mx-auto" />
-            <p className="text-sm font-semibold text-zinc-300">
+          <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
+            <Search className="w-8 h-8 text-stone-400 mx-auto" />
+            <p className="font-display text-sm font-bold text-zinc-950">
               No recommended items found
             </p>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+            <p className="text-xs text-stone-500 max-w-sm mx-auto">
               {searchQuery
                 ? `No items matching "${searchQuery}" have at least 1 recommendation on the platform.`
                 : "Be the first to add a recommendation in this category!"}
             </p>
             <button
+              type="button"
               onClick={onOpenAddModal}
-              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-medium transition-colors"
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
             >
               + Add Recommendation
             </button>

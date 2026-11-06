@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { clearCachedVaultKeys } from '../lib/googleDriveVault'
 
 // Authentication and user profile context
 const AuthContext = createContext(null)
@@ -52,6 +53,7 @@ function getInitialMockState() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => (!isSupabaseConfigured ? getInitialMockState().user : null))
   const [profile, setProfile] = useState(() => (!isSupabaseConfigured ? getInitialMockState().profile : null))
+  const [providerToken, setProviderToken] = useState(null)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [authError, setAuthError] = useState(getInitialAuthError)
@@ -165,6 +167,9 @@ export function AuthProvider({ children }) {
         }
         if (session?.user) {
           setUser(session.user)
+          if (session.provider_token) {
+            setProviderToken(session.provider_token)
+          }
           await fetchProfile(session.user)
         }
       } catch (err) {
@@ -180,19 +185,25 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user)
+        if (session.provider_token) {
+          setProviderToken(session.provider_token)
+        }
         setIsAuthenticating(false)
         setAuthError(null)
         await fetchProfile(session.user)
-        // Clean any auth code or hash tokens from URL bar after exchange is confirmed
+        // Clean any auth code or hash tokens from URL bar after exchange is confirmed and redirect to feed
         if (typeof window !== 'undefined') {
           if (window.location.hash?.includes('access_token') || window.location.search?.includes('code=')) {
             const cleanHash = window.location.hash?.startsWith('#/u/') ? window.location.hash : ''
-            window.history.replaceState(null, '', window.location.pathname + cleanHash)
+            window.history.replaceState(null, '', '/feed' + cleanHash)
+            window.dispatchEvent(new Event('popstate'))
           }
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
+        setProviderToken(null)
+        clearCachedVaultKeys()
         setIsAuthenticating(false)
       }
       setLoading(false)
@@ -221,19 +232,25 @@ export function AuthProvider({ children }) {
       setProfile(mockProf)
       localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(mockProf))
       setIsAuthenticating(false)
+      // Navigate to /feed if currently on home/landing page
+      if (typeof window !== 'undefined' && window.location.pathname === '/') {
+        window.history.pushState(null, '', '/feed')
+        window.dispatchEvent(new Event('popstate'))
+      }
       return { success: true }
     }
 
     try {
-      // Trigger OAuth flow with redirect
-      const redirectUri = typeof window !== 'undefined' ? window.location.origin : ''
+      // Trigger OAuth flow with redirect to /feed and Google Drive appDataFolder scope
+      const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/feed` : ''
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUri,
+          scopes: 'https://www.googleapis.com/auth/drive.appdata',
           queryParams: {
             access_type: 'offline',
-            prompt: 'select_account'
+            prompt: 'consent'
           }
         }
       })
@@ -357,6 +374,8 @@ export function AuthProvider({ children }) {
   async function signOut() {
     setIsAuthenticating(false)
     setAuthError(null)
+    setProviderToken(null)
+    clearCachedVaultKeys()
     if (!isSupabaseConfigured) {
       localStorage.removeItem(MOCK_STORAGE_KEY)
       setUser(null)
@@ -367,6 +386,28 @@ export function AuthProvider({ children }) {
     setUser(null)
     setProfile(null)
   }
+
+  // Save public key JWK string to profile in Supabase for peer-to-peer recommendation sharing
+  const savePublicKeyToProfile = useCallback(async (publicKeyJwkString) => {
+    if (!profile?.id) return
+    if (!isSupabaseConfigured) {
+      setProfile(prev => prev ? { ...prev, public_key: publicKeyJwkString } : null)
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ public_key: publicKeyJwkString })
+        .eq('id', profile.id)
+      if (error) {
+        console.warn('Failed to save public_key to profile:', error.message)
+      } else {
+        setProfile(prev => prev ? { ...prev, public_key: publicKeyJwkString } : null)
+      }
+    } catch (err) {
+      console.warn('savePublicKeyToProfile exception:', err)
+    }
+  }, [profile])
 
   // Update profile details (username, display name)
   async function updateProfile({ username, display_name }) {
@@ -415,6 +456,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user,
       profile,
+      providerToken,
+      savePublicKeyToProfile,
       loading,
       isAuthenticating,
       authError,

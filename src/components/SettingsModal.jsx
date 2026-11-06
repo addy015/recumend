@@ -37,17 +37,18 @@ export default function SettingsModal({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-zinc-900 border border-zinc-800 p-4 sm:p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
           <div>
-            <h2 className="text-base font-bold text-zinc-100">Account Settings</h2>
-            <p className="text-xs text-zinc-400">Update your username and display name</p>
+            <h2 className="font-display text-base font-bold text-zinc-950">Account Settings</h2>
+            <p className="text-xs text-stone-500">Update your username and display name</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -56,7 +57,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         <form onSubmit={handleSave} className="space-y-4">
           {/* Mutable Display Name */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Display Name
             </label>
             <input
@@ -65,51 +66,51 @@ export default function SettingsModal({ isOpen, onClose }) {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="e.g. Abhishek"
-              className="w-full bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
             />
           </div>
 
           {/* Mutable Username */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Unique Handle (@username)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500 font-mono">@</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-mono">@</span>
               <input
                 type="text"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                 placeholder="username"
-                className="w-full bg-zinc-950 border border-zinc-800 pl-7 pr-3.5 py-2 text-xs font-mono text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                className="w-full bg-stone-50 border border-stone-200 pl-7 pr-3.5 py-2 text-xs font-mono text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
               />
             </div>
-            <p className="text-[11px] text-zinc-500 mt-1">Friends can search and find your profile using this handle.</p>
+            <p className="text-[11px] text-stone-500 mt-1">Friends can search and find your profile using this handle.</p>
           </div>
 
           {/* Status Message */}
           {status && (
-            <div className={`p-2.5 text-xs font-medium ${
-              status.type === 'error' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            <div className={`p-2.5 text-xs font-medium rounded-xl ${
+              status.type === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
             }`}>
               {status.msg}
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>

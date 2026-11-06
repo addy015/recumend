@@ -73,7 +73,11 @@ const vercelConfig = fs.readFileSync(new URL('../vercel.json', import.meta.url),
 assert.ok(vercelConfig.includes('Strict-Transport-Security'), 'vercel.json missing Strict-Transport-Security')
 assert.ok(vercelConfig.includes('Content-Security-Policy'), 'vercel.json missing Content-Security-Policy')
 assert.ok(vercelConfig.includes('Cache-Control'), 'vercel.json missing Cache-Control')
-console.log('  ✅ Passed: CSP, HSTS, and HTTP production security headers active.\n')
+
+// Verify Google APIs is whitelisted for Google Drive appDataFolder vault
+assert.ok(indexHtml.includes('https://www.googleapis.com'), 'index.html connect-src must allow https://www.googleapis.com for Drive vault')
+assert.ok(vercelConfig.includes('https://www.googleapis.com'), 'vercel.json connect-src must allow https://www.googleapis.com for Drive vault')
+console.log('  ✅ Passed: CSP, HSTS, Google Drive API allowlist, and HTTP production security headers active.\n')
 
 
 // ---------------------------------------------------------
@@ -88,5 +92,79 @@ assert.ok(validCategoryIds.has('anime'), 'anime must be in category list')
 assert.ok(validCategoryIds.has('app'), 'app must be in category list')
 assert.ok(!validCategoryIds.has('<script>'), 'XSS in categories must be impossible')
 console.log('  ✅ Passed: Category allowlist and schema verified.\n')
+
+// ---------------------------------------------------------
+// TEST 6: Web Crypto E2EE Vault & Cryptographic Integrity
+// ---------------------------------------------------------
+console.log('Test 6: Web Crypto E2EE Vault, Tamper Detection & Key Derivation')
+import {
+  generateUnifiedVaultKeys,
+  exportVaultBundle,
+  importVaultBundle,
+  encryptData,
+  decryptData,
+  deriveSharedKey
+} from '../src/lib/vaultCrypto.js'
+
+// 1. Unified Key Generation, Export & Import
+const keys = await generateUnifiedVaultKeys()
+assert.ok(keys.vaultKey, 'AES-GCM vaultKey generation failed')
+assert.ok(keys.ecdhKeyPair?.publicKey, 'ECDH publicKey generation failed')
+assert.ok(keys.ecdhKeyPair?.privateKey, 'ECDH privateKey generation failed')
+
+const bundleJson = await exportVaultBundle(keys)
+assert.ok(bundleJson.includes('"version":1'), 'Bundle must contain version 1')
+assert.ok(bundleJson.includes('"vaultKey"'), 'Bundle must contain vaultKey')
+assert.ok(bundleJson.includes('"ecdhKeyPair"'), 'Bundle must contain ecdhKeyPair')
+
+const imported = await importVaultBundle(bundleJson)
+assert.ok(imported.vaultKey, 'Imported bundle missing vaultKey')
+assert.ok(imported.ecdhKeyPair?.publicKey, 'Imported bundle missing publicKey')
+assert.ok(imported.publicKeyJwkString, 'Imported bundle missing publicKeyJwkString')
+
+// 2. Encryption and Decryption Roundtrip
+const samplePayload = {
+  title: 'Severance (Season 2) 🎬✨',
+  category: 'show',
+  metadata: { note: 'Top secret spoiler-filled note with unicode: 🚀🔒', platform: 'Apple TV+' }
+}
+
+const encrypted = await encryptData(samplePayload, imported.vaultKey)
+assert.ok(encrypted.ciphertext, 'Ciphertext must not be empty')
+assert.ok(encrypted.iv, 'IV must not be empty')
+assert.notEqual(encrypted.ciphertext, samplePayload.title, 'Plaintext must not appear in ciphertext')
+
+const decrypted = await decryptData(encrypted.ciphertext, encrypted.iv, imported.vaultKey)
+assert.deepEqual(decrypted, samplePayload, 'Decrypted payload must match original sample exactly')
+
+// 3. Tamper Resistance (Authenticated Encryption Tag Verification)
+const tamperedCiphertext = (encrypted.ciphertext.startsWith('A') ? 'B' : 'A') + encrypted.ciphertext.slice(1)
+let tamperDetected = false
+try {
+  await decryptData(tamperedCiphertext, encrypted.iv, imported.vaultKey)
+} catch {
+  tamperDetected = true
+}
+assert.ok(tamperDetected, 'AES-GCM must reject tampered ciphertext')
+
+// 4. Peer-to-Peer ECDH Key Derivation
+const userA = await generateUnifiedVaultKeys()
+const userB = await generateUnifiedVaultKeys()
+
+const bundleA = await exportVaultBundle(userA)
+const bundleB = await exportVaultBundle(userB)
+
+const importedA = await importVaultBundle(bundleA)
+const importedB = await importVaultBundle(bundleB)
+
+const sharedSecretA = await deriveSharedKey(importedA.ecdhKeyPair.privateKey, importedB.publicKeyJwkString)
+const sharedSecretB = await deriveSharedKey(importedB.ecdhKeyPair.privateKey, importedA.publicKeyJwkString)
+
+const peerPayload = { message: 'Shared recommendation from User A' }
+const peerEncrypted = await encryptData(peerPayload, sharedSecretA)
+const peerDecrypted = await decryptData(peerEncrypted.ciphertext, peerEncrypted.iv, sharedSecretB)
+assert.deepEqual(peerDecrypted, peerPayload, 'Peer-to-peer derived keys must decrypt each other seamlessly')
+
+console.log('  ✅ Passed: Unified crypto keys, authenticated AES-GCM encryption, tamper rejection, and ECDH derivation verified.\n')
 
 console.log('All Security Automated Tests Passed Successfully!')

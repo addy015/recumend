@@ -78,25 +78,26 @@ export default function AuthModal({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="w-full max-w-sm bg-white border border-stone-200 rounded-2xl p-6 shadow-2xl space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="font-bold text-base text-zinc-100">
+              <span className="font-display font-bold text-base text-zinc-950">
                 {mode === 'signin' ? 'Welcome Back' : 'Join recumend'}
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-stone-500">
               {mode === 'signin'
                 ? 'Sign in to recommend your favorites & manage votes'
                 : 'Create an account to start curating recommendations'}
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -104,14 +105,14 @@ export default function AuthModal({ isOpen, onClose }) {
 
         {/* Error / Success notice */}
         {errorMsg && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
             <span className="leading-relaxed">{errorMsg}</span>
           </div>
         )}
         {successNotice && (
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
             <span className="leading-relaxed">{successNotice}</span>
           </div>
         )}
@@ -121,7 +122,7 @@ export default function AuthModal({ isOpen, onClose }) {
           type="button"
           onClick={handleGoogleAuth}
           disabled={isAuthenticating || loading}
-          className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800/80 disabled:opacity-60 disabled:cursor-not-allowed border border-zinc-800 text-xs font-semibold text-zinc-200 transition-all shadow-sm"
+          className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed border border-stone-200 text-xs font-semibold text-zinc-800 rounded-xl transition-all shadow-xs cursor-pointer"
         >
           {isAuthenticating ? (
             <span>Connecting with Google...</span>
@@ -140,61 +141,61 @@ export default function AuthModal({ isOpen, onClose }) {
 
         {/* Divider */}
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-zinc-800" />
-          <span className="text-[10px] font-mono uppercase text-zinc-500">or with email</span>
-          <div className="flex-1 h-px bg-zinc-800" />
+          <div className="flex-1 h-px bg-stone-200" />
+          <span className="text-[10px] font-mono uppercase text-stone-400">or with email</span>
+          <div className="flex-1 h-px bg-stone-200" />
         </div>
 
         {/* Email Form */}
         <form onSubmit={handleEmailAuth} className="space-y-3">
           {mode === 'signup' && (
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
                 Display Name
               </label>
               <div className="relative">
-                <User className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <User className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="e.g. Abhishek"
-                  className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+                  className="w-full bg-stone-50 border border-stone-200 pl-9 pr-3 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+            <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Mail className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+                className="w-full bg-stone-50 border border-stone-200 pl-9 pr-3 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+            <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
               Password
             </label>
             <div className="relative">
-              <Lock className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Lock className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+                className="w-full bg-stone-50 border border-stone-200 pl-9 pr-3 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
               />
             </div>
           </div>
@@ -202,7 +203,7 @@ export default function AuthModal({ isOpen, onClose }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-1.5 py-2 px-4 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors disabled:opacity-50 mt-1 shadow-sm"
+            className="w-full flex items-center justify-center gap-1.5 py-2 px-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all disabled:opacity-50 mt-1 shadow-xs cursor-pointer"
           >
             {loading ? (
               <span>Please wait...</span>
@@ -221,25 +222,25 @@ export default function AuthModal({ isOpen, onClose }) {
         </form>
 
         {/* Toggle Mode */}
-        <div className="text-center pt-1 border-t border-zinc-800/80">
+        <div className="text-center pt-2 border-t border-stone-100">
           {mode === 'signin' ? (
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-stone-500">
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('signup'); setErrorMsg(null); }}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold"
+                className="text-zinc-950 hover:text-[#2D6A4F] font-semibold cursor-pointer underline underline-offset-2"
               >
                 Sign Up
               </button>
             </p>
           ) : (
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-stone-500">
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('signin'); setErrorMsg(null); }}
-                className="text-emerald-400 hover:text-emerald-300 font-semibold"
+                className="text-zinc-950 hover:text-[#2D6A4F] font-semibold cursor-pointer underline underline-offset-2"
               >
                 Sign In
               </button>

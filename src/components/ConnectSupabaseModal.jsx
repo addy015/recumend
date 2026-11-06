@@ -1,102 +1,61 @@
 import React, { useState } from 'react'
-import { X, Database, Check, Copy, ExternalLink, AlertCircle, Key, Globe, ShieldCheck } from 'lucide-react'
-import { isSupabaseConfigured, supabaseUrl, supabaseAnonKey, saveSupabaseConfig, clearSupabaseConfig, hasValidEnv, isProduction } from '../lib/supabase'
+import { X, Database, Check, Copy, ExternalLink, ShieldCheck, AlertCircle, Key, Globe } from 'lucide-react'
+import {
+  supabaseUrl,
+  supabaseAnonKey,
+  saveSupabaseConfig,
+  clearSupabaseConfig,
+  isSupabaseConfigured,
+  hasValidEnv,
+  isProduction
+} from '../lib/supabase'
 
-const SQL_SCHEMA = `-- Recumend: Initial PostgreSQL Schema for Supabase
+// Full database schema SQL to create required tables, security constraints, and RLS policies
+const SQL_SCHEMA = `-- 1. ENABLE EXTENSIONS
+create extension if not exists "uuid-ossp";
 
--- 1. PROFILES TABLE
+-- 2. CREATE PROFILES TABLE
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   app_uid text unique not null,
   username text unique not null,
   display_name text not null,
   avatar_url text,
-  created_at timestamptz default timezone('utc'::text, now()) not null,
-  updated_at timestamptz default timezone('utc'::text, now()) not null
+  created_at timestamptz default now()
 );
 
-create index if not exists idx_profiles_username on public.profiles (username);
-create index if not exists idx_profiles_app_uid on public.profiles (app_uid);
-
--- 2. ITEMS TABLE
+-- 3. CREATE ITEMS TABLE
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   normalized_title text not null,
-  category text not null check (category in ('movie', 'show', 'anime', 'book', 'game', 'yt', 'docu', 'app', 'other')),
-  recommend_count integer default 1 not null,
-  created_by uuid references public.profiles(id) on delete set null,
-  metadata jsonb default '{}'::jsonb not null,
-  created_at timestamptz default timezone('utc'::text, now()) not null,
-  updated_at timestamptz default timezone('utc'::text, now()) not null,
-  constraint unique_item_category unique (normalized_title, category)
+  category text not null,
+  created_by uuid references auth.users(id) on delete set null,
+  recommend_count integer default 1,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now()
 );
 
-create index if not exists idx_items_recommend_count on public.items (recommend_count desc);
-create index if not exists idx_items_recommend_count_created on public.items (recommend_count desc, created_at asc);
-create index if not exists idx_items_category on public.items (category);
-create index if not exists idx_items_normalized_title on public.items (normalized_title);
-
--- 3. RECOMMENDATIONS (VOTES) TABLE
+-- 4. CREATE RECOMMENDATIONS TABLE
 create table if not exists public.recommendations (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id uuid references auth.users(id) on delete cascade not null,
   item_id uuid references public.items(id) on delete cascade not null,
-  created_at timestamptz default timezone('utc'::text, now()) not null,
-  constraint unique_user_item_rec unique (user_id, item_id)
+  created_at timestamptz default now(),
+  unique (user_id, item_id)
 );
 
-create index if not exists idx_recommendations_user on public.recommendations (user_id);
-create index if not exists idx_recommendations_item on public.recommendations (item_id);
-
--- 4. TAMPER PROTECTION & TRIGGER TO AUTO-UPDATE RECOMMEND_COUNT (Rule 12 & 24)
-create or replace function public.protect_item_columns()
-returns trigger as $$
-begin
-  if current_setting('recumend.is_vote_trigger', true) is distinct from 'true' then
-    NEW.recommend_count := OLD.recommend_count;
-  end if;
-  NEW.created_by := OLD.created_by;
-  NEW.created_at := OLD.created_at;
-  NEW.updated_at := timezone('utc'::text, now());
-  return NEW;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists trigger_protect_item_columns on public.items;
-create trigger trigger_protect_item_columns
-before update on public.items
-for each row execute function public.protect_item_columns();
-
-create or replace function public.update_item_recommend_count()
-returns trigger as $$
-begin
-  perform set_config('recumend.is_vote_trigger', 'true', true);
-  if (TG_OP = 'INSERT') then
-    update public.items set recommend_count = recommend_count + 1 where id = NEW.item_id;
-  elsif (TG_OP = 'DELETE') then
-    update public.items set recommend_count = greatest(1, recommend_count - 1) where id = OLD.item_id;
-  end if;
-  return null;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists trigger_recommend_count on public.recommendations;
-create trigger trigger_recommend_count
-after insert or delete on public.recommendations
-for each row execute function public.update_item_recommend_count();
-
--- 5. ROW LEVEL SECURITY (RLS)
+-- 5. ENABLE ROW LEVEL SECURITY
 alter table public.profiles enable row level security;
 alter table public.items enable row level security;
 alter table public.recommendations enable row level security;
 
+-- Security Policies
 create policy "Profiles readable by anyone" on public.profiles for select using (true);
 create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
-create policy "Users can insert own profile" on public.profiles for insert with check (auth.uid() = id);
 
 create policy "Items readable by anyone" on public.items for select using (true);
-create policy "Authenticated users can insert items" on public.items for insert with check (auth.role() = 'authenticated');
+create policy "Authenticated users can create items" on public.items for insert with check (auth.role() = 'authenticated');
 create policy "Users can update own created items" on public.items for update using (auth.uid() = created_by);
 create policy "Users can delete own created items" on public.items for delete using (auth.uid() = created_by);
 
@@ -152,58 +111,59 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-zinc-900 border border-zinc-800 p-4 sm:p-6 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5">
         {/* Header */}
-        <div className="flex items-start justify-between pb-3 border-b border-zinc-800">
+        <div className="flex items-start justify-between pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-zinc-100 flex items-center gap-2">
+              <h2 className="font-display font-bold text-base text-zinc-950 flex items-center gap-2">
                 Connect Supabase Backend
                 {isSupabaseConfigured ? (
-                  <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full font-semibold">
                     Connected
                   </span>
                 ) : (
-                  <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-full font-semibold">
                     Demo Mode
                   </span>
                 )}
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs text-stone-500 mt-0.5">
                 Connect your PostgreSQL database for live multi-user sync and real authentication.
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Setup Steps Accordion */}
-        <div className="p-3.5 bg-zinc-950 border border-zinc-800 text-xs space-y-2">
-          <div className="flex items-center justify-between font-semibold text-zinc-200">
+        <div className="p-3.5 bg-stone-50 border border-stone-200 rounded-2xl text-xs space-y-2">
+          <div className="flex items-center justify-between font-semibold text-zinc-900">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               Quick 2-Step Supabase Setup
             </span>
             <a
               href="https://supabase.com/dashboard"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-emerald-400 hover:underline inline-flex items-center gap-1"
+              className="text-[11px] text-emerald-700 hover:underline inline-flex items-center gap-1"
             >
               Open Supabase Dashboard
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
-          <ol className="list-decimal list-inside text-zinc-400 space-y-1 pl-1 leading-relaxed">
+          <ol className="list-decimal list-inside text-stone-600 space-y-1 pl-1 leading-relaxed">
             <li>Open your Supabase Project &rarr; <strong>SQL Editor</strong> &rarr; New Query.</li>
             <li>
               Click below to copy SQL Schema, paste into the query, and click <strong>Run</strong>.
@@ -214,16 +174,16 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={handleCopySql}
-            className="w-full mt-2 py-1.5 px-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            className="w-full mt-2 py-2 px-3 bg-white hover:bg-stone-100 border border-stone-200 text-zinc-800 text-xs font-semibold flex items-center justify-center gap-1.5 rounded-xl transition-colors cursor-pointer shadow-xs"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">SQL Schema Copied to Clipboard!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-emerald-700">SQL Schema Copied to Clipboard!</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5 text-zinc-400" />
+                <Copy className="w-3.5 h-3.5 text-stone-400" />
                 <span>Copy PostgreSQL Schema SQL</span>
               </>
             )}
@@ -231,62 +191,62 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {hasValidEnv && isProduction ? (
-          <div className="p-4 bg-zinc-950 border border-zinc-800 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400">
-              <ShieldCheck className="w-4 h-4" />
+          <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Production Credentials Locked</span>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Database connection is securely managed via hosting environment variables (<code className="text-zinc-300 font-mono">VITE_SUPABASE_URL</code>). In-browser modifications and demo fallback are disabled.
+            <p className="text-xs text-stone-600 leading-relaxed">
+              Database connection is securely managed via hosting environment variables (<code className="text-stone-800 font-mono">VITE_SUPABASE_URL</code>). In-browser modifications and demo fallback are disabled.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-3">
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                Project URL (<code className="text-emerald-400 font-mono">VITE_SUPABASE_URL</code>)
+              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+                Project URL (<code className="text-emerald-700 font-mono">VITE_SUPABASE_URL</code>)
               </label>
               <div className="relative">
-                <Globe className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Globe className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="url"
                   required
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://xyzcompany.supabase.co"
-                  className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
+                  className="w-full bg-stone-50 border border-stone-200 pl-9 pr-3 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-                Anon / Public API Key (<code className="text-emerald-400 font-mono">VITE_SUPABASE_ANON_KEY</code>)
+              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+                Anon / Public API Key (<code className="text-emerald-700 font-mono">VITE_SUPABASE_ANON_KEY</code>)
               </label>
               <div className="relative">
-                <Key className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Key className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   required
                   value={anonKey}
                   onChange={(e) => setAnonKey(e.target.value)}
                   placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  className="w-full bg-zinc-950 border border-zinc-800 pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
+                  className="w-full bg-stone-50 border border-stone-200 pl-9 pr-3 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors font-mono"
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
               <button
                 type="submit"
-                className="flex-1 py-2 px-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-semibold transition-colors shadow-sm"
+                className="flex-1 py-2 px-4 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-colors shadow-xs cursor-pointer"
               >
                 Save & Connect
               </button>
@@ -294,7 +254,7 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={handleResetToDemo}
-                  className="py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors border border-zinc-700/60"
+                  className="py-2 px-3 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-medium rounded-xl transition-colors cursor-pointer"
                 >
                   Reset to Demo
                 </button>
@@ -303,11 +263,10 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
           </form>
         )}
 
-        <p className="text-[11px] text-zinc-500 text-center">
-          Credentials can also be stored in <code className="font-mono text-zinc-400">.env</code> in the project root.
+        <p className="text-[11px] text-stone-500 text-center font-mono">
+          Credentials can also be stored in <code className="font-mono text-stone-700">.env</code> in the project root.
         </p>
       </div>
     </div>
   )
 }
-

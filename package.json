@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:security": "node tests/security.test.js"
+    "test:security": "node tests/security.test.js",
+    "test:vault": "node tests/vault.test.js",
+    "test": "npm run test:security && npm run test:vault"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

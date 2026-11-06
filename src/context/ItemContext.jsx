@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { syncUnifiedVault } from '../lib/googleDriveVault'
+import { encryptData, decryptData } from '../lib/vaultCrypto'
 
 // Recommendation items and votes context
 const ItemContext = createContext(null)
@@ -81,11 +83,95 @@ const INITIAL_ITEMS = [
 
 // Provider managing recommendations, user votes, and real-time feed updates
 export function ItemProvider({ children }) {
-  const { user, profile } = useAuth()
+  const { user, profile, providerToken, savePublicKeyToProfile } = useAuth()
   const [items, setItems] = useState([])
   const [userRecs, setUserRecs] = useState(new Set())
   const [loading, setLoading] = useState(true)
+  const [vaultKeys, setVaultKeys] = useState(null)
+  const [isVaultSyncing, setIsVaultSyncing] = useState(false)
+  const [vaultError, setVaultError] = useState(null)
   const votingInProgress = useRef(new Set())
+
+  // Synchronize unified encryption vault (AES-256 for personal vault + ECDH P-256 for peer sharing)
+  useEffect(() => {
+    let isMounted = true
+    if (!user?.id) return
+
+    setIsVaultSyncing(true)
+    setVaultError(null)
+
+    syncUnifiedVault(providerToken, savePublicKeyToProfile)
+      .then((keys) => {
+        if (isMounted) {
+          setVaultKeys(keys)
+          setIsVaultSyncing(false)
+        }
+      })
+      .catch((err) => {
+        console.error('Vault sync error:', err)
+        if (isMounted) {
+          setVaultError(err.message || 'Failed to sync encryption vault')
+          setIsVaultSyncing(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, providerToken, savePublicKeyToProfile])
+
+  // Helper to decrypt a single private item
+  const decryptSingleItem = async (item, key) => {
+    if (!item?.is_private || !item?.ciphertext || !item?.iv) return item
+    try {
+      const dec = await decryptData(item.ciphertext, item.iv, key)
+      if (typeof dec === 'object' && dec !== null) {
+        return {
+          ...item,
+          title: dec.title || item.title,
+          metadata: { ...(item.metadata || {}), ...(dec.metadata || {}) },
+          _isDecrypted: true
+        }
+      }
+      return {
+        ...item,
+        title: dec,
+        _isDecrypted: true
+      }
+    } catch (err) {
+      console.error('Decryption failed for item:', item.id, err)
+      return {
+        ...item,
+        _decryptionFailed: true
+      }
+    }
+  }
+
+  // Decrypt pending private items whenever vaultKey is initialized or changes
+  useEffect(() => {
+    if (!vaultKeys?.vaultKey) return
+    let isCancelled = false
+
+    async function decryptPendingItems() {
+      const pending = items.filter(it => it.is_private && !it._isDecrypted && it.ciphertext && it.iv)
+      if (pending.length === 0) return
+
+      const decryptedList = await Promise.all(
+        pending.map(it => decryptSingleItem(it, vaultKeys.vaultKey))
+      )
+
+      if (isCancelled) return
+
+      const updateMap = new Map(decryptedList.map(it => [it.id, it]))
+      setItems(prev => prev.map(it => updateMap.get(it.id) || it))
+    }
+
+    decryptPendingItems()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [vaultKeys, items])
 
   // Load items on mount (either from localStorage or Supabase database)
   useEffect(() => {
@@ -104,9 +190,9 @@ export function ItemProvider({ children }) {
               ? JSON.parse(savedRecs)
               : ['item-1', 'item-3', 'item-5']
           )
-          // Ensure all items created by the user are always recommended by them
+          // Ensure public items created by user are in recsSet
           initial.forEach(it => {
-            if (it.created_by === user.id) {
+            if (it.created_by === user.id && !it.is_private) {
               recsSet.add(it.id)
             }
           })
@@ -119,18 +205,55 @@ export function ItemProvider({ children }) {
         return
       }
 
-      // Fetch items and current user's upvotes from Supabase
+      // Fetch public items AND user's private items from Supabase
       try {
-        const { data: dbItems, error: _err } = await supabase
+        let publicItems = []
+        let privateItems = []
+
+        // Try querying with is_private filter (Migration 004)
+        const pubRes = await supabase
           .from('items')
           .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+          .eq('is_private', false)
           .gte('recommend_count', 1)
           .order('recommend_count', { ascending: false })
           .order('created_at', { ascending: true })
 
-        if (dbItems) {
-          setItems(dbItems)
+        if (pubRes.error) {
+          // Fallback: If 004_private_vault.sql migration has not been run yet in Supabase SQL editor,
+          // PostgREST will fail with 'column items.is_private does not exist'. Fallback to plain query.
+          console.warn('Migration 004 not yet detected on Supabase (is_private filter fallback):', pubRes.error.message)
+          const fallbackRes = await supabase
+            .from('items')
+            .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+            .gte('recommend_count', 1)
+            .order('recommend_count', { ascending: false })
+            .order('created_at', { ascending: true })
+          publicItems = fallbackRes.data || []
+        } else {
+          publicItems = pubRes.data || []
         }
+
+        if (user?.id) {
+          try {
+            const privRes = await supabase
+              .from('items')
+              .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+              .eq('is_private', true)
+              .eq('created_by', user.id)
+              .order('created_at', { ascending: false })
+            if (!privRes.error && privRes.data) {
+              privateItems = privRes.data
+            }
+          } catch {
+            // Migration 004 might not exist yet, ignore private query failure
+            privateItems = []
+          }
+        }
+
+        const combined = [...publicItems, ...privateItems]
+
+        setItems(combined)
 
         if (user?.id) {
           const { data: recs } = await supabase
@@ -139,8 +262,8 @@ export function ItemProvider({ children }) {
             .eq('user_id', user.id)
 
           const recSet = new Set(recs ? recs.map(r => r.item_id) : [])
-          if (dbItems) {
-            dbItems.forEach(it => {
+          if (publicItems) {
+            publicItems.forEach(it => {
               if (it.created_by === user.id) {
                 recSet.add(it.id)
               }
@@ -193,8 +316,12 @@ export function ItemProvider({ children }) {
         { event: 'INSERT', schema: 'public', table: 'items' },
         async (payload) => {
           const newItem = payload.new
-          // Don't add items with recommend_count < 1 (intermediate state before initial recommendation trigger)
-          if (!newItem || newItem.recommend_count < 1) return
+          if (!newItem) return
+          if (newItem.is_private) {
+            if (newItem.created_by !== user?.id) return
+          } else if (newItem.recommend_count < 1) {
+            return
+          }
 
           let creatorData = null
           if (newItem.created_by) {
@@ -225,29 +352,31 @@ export function ItemProvider({ children }) {
         async (payload) => {
           const updated = payload.new
           if (updated) {
-            if (updated.recommend_count >= 1) {
-              setItems((prev) => {
-                const existing = prev.find((it) => it.id === updated.id)
-                const merged = { ...updated, creator: existing?.creator || null }
-                if (existing) {
-                  return prev.map((it) => (it.id === updated.id ? merged : it))
-                }
-                return [merged, ...prev]
-              })
-
-              // Fetch creator profile if not already attached
-              if (updated.created_by) {
-                const { data: p } = await supabase
-                  .from('profiles')
-                  .select('id, username, display_name, avatar_url, app_uid')
-                  .eq('id', updated.created_by)
-                  .single()
-                if (p) {
-                  setItems((prev) => prev.map((it) => (it.id === updated.id ? { ...it, creator: p } : it)))
-                }
-              }
-            } else {
+            if (updated.is_private) {
+              if (updated.created_by !== user?.id) return
+            } else if (updated.recommend_count < 1) {
               setItems((prev) => prev.filter((it) => it.id !== updated.id))
+              return
+            }
+            setItems((prev) => {
+              const existing = prev.find((it) => it.id === updated.id)
+              const merged = { ...updated, creator: existing?.creator || null }
+              if (existing) {
+                return prev.map((it) => (it.id === updated.id ? merged : it))
+              }
+              return [merged, ...prev]
+            })
+
+            // Fetch creator profile if not already attached
+            if (updated.created_by) {
+              const { data: p } = await supabase
+                .from('profiles')
+                .select('id, username, display_name, avatar_url, app_uid')
+                .eq('id', updated.created_by)
+                .single()
+              if (p) {
+                setItems((prev) => prev.map((it) => (it.id === updated.id ? { ...it, creator: p } : it)))
+              }
             }
           }
         }
@@ -267,7 +396,7 @@ export function ItemProvider({ children }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user?.id])
 
   // Strip punctuation and normalize whitespace for duplicate detection
   function normalizeTitle(str) {
@@ -390,8 +519,8 @@ export function ItemProvider({ children }) {
     }
   }
 
-  // Add a new recommendation with deduplication checks
-  async function addItem({ title, category, metadata = {} }) {
+  // Add a new recommendation with deduplication checks (supports public and private E2EE items)
+  async function addItem({ title, category, metadata = {}, is_private = false }) {
     if (!user) return { error: 'Must be logged in' }
 
     const cleanTitle = title ? title.trim() : ''
@@ -411,13 +540,94 @@ export function ItemProvider({ children }) {
     const norm = normalizeTitle(cleanTitle)
     if (!norm) return { error: 'Invalid title characters' }
 
-    // Check if item already exists in this category
-    const existing = items.find(
-      it => it.normalized_title === norm && it.category === category
-    )
+    // If public item, check if it already exists in the same category
+    if (!is_private) {
+      const existing = items.find(
+        it => !it.is_private && it.normalized_title === norm && it.category === category
+      )
+      if (existing) {
+        return { exists: true, item: existing }
+      }
+    }
 
-    if (existing) {
-      return { exists: true, item: existing }
+    // Handle Private E2EE Vault Item
+    if (is_private) {
+      if (!vaultKeys?.vaultKey) {
+        return { error: 'Encryption vault is still syncing with Google Drive. Please wait a few seconds and try again.' }
+      }
+
+      const encrypted = await encryptData({ title: cleanTitle, metadata }, vaultKeys.vaultKey)
+
+      if (!isSupabaseConfigured) {
+        const newItem = {
+          id: `item-priv-${Date.now()}`,
+          title: cleanTitle,
+          normalized_title: 'enc_' + Date.now(),
+          category,
+          is_private: true,
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv,
+          recommend_count: 0,
+          created_by: user.id,
+          creator: profile ? {
+            id: profile.id,
+            username: profile.username,
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+            app_uid: profile.app_uid
+          } : null,
+          metadata,
+          created_at: new Date().toISOString(),
+          _isDecrypted: true
+        }
+
+        const nextItems = [newItem, ...items]
+        setItems(nextItems)
+        localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(nextItems))
+        return { success: true, item: newItem }
+      }
+
+      try {
+        const randomSuffix = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)
+        const { data: createdItem, error: itemErr } = await supabase
+          .from('items')
+          .insert({
+            title: '[Encrypted Item]',
+            normalized_title: 'enc_' + randomSuffix,
+            category,
+            is_private: true,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            recommend_count: 0,
+            created_by: user.id,
+            metadata: {}
+          })
+          .select()
+          .single()
+
+        if (itemErr) throw itemErr
+
+        const finalItem = {
+          ...createdItem,
+          title: cleanTitle,
+          metadata,
+          _isDecrypted: true,
+          creator: profile ? {
+            id: profile.id,
+            username: profile.username,
+            display_name: profile.display_name,
+            avatar_url: profile.avatar_url,
+            app_uid: profile.app_uid
+          } : null
+        }
+
+        // Prepend to top of state (Reverse-chronological top-first placement)
+        setItems(prev => [finalItem, ...prev.filter(it => it.id !== finalItem.id)])
+        return { success: true, item: finalItem }
+      } catch (err) {
+        console.error('Add private item error:', err)
+        return { error: err.message || 'Failed to save private recommendation' }
+      }
     }
 
     if (!isSupabaseConfigured) {
@@ -426,6 +636,7 @@ export function ItemProvider({ children }) {
         title: cleanTitle,
         normalized_title: norm,
         category,
+        is_private: false,
         recommend_count: 1,
         created_by: user.id,
         creator: profile ? {
@@ -451,13 +662,14 @@ export function ItemProvider({ children }) {
     }
 
     try {
-      // Insert item with 0 count so trigger on recommendation insert brings it to exactly 1
+      // Insert public item with 0 count so trigger on recommendation insert brings it to exactly 1
       const { data: createdItem, error: itemErr } = await supabase
         .from('items')
         .insert({
           title: cleanTitle,
           normalized_title: norm,
           category,
+          is_private: false,
           recommend_count: 0,
           created_by: user.id,
           metadata
@@ -477,6 +689,7 @@ export function ItemProvider({ children }) {
 
       const finalItem = {
         ...createdItem,
+        is_private: false,
         recommend_count: 1,
         creator: profile ? {
           id: profile.id,
@@ -488,22 +701,6 @@ export function ItemProvider({ children }) {
       }
       setItems(prev => [finalItem, ...prev.filter(it => it.id !== finalItem.id)])
       setUserRecs(prev => new Set(prev).add(createdItem.id))
-
-      // Authoritative Supabase re-fetch to ensure trigger sync and exact ranking order
-      try {
-        const { data: dbItems } = await supabase
-          .from('items')
-          .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
-          .gte('recommend_count', 1)
-          .order('recommend_count', { ascending: false })
-          .order('created_at', { ascending: true })
-
-        if (dbItems && dbItems.length > 0) {
-          setItems(dbItems)
-        }
-      } catch (refetchErr) {
-        console.warn('Post-add refetch warning:', refetchErr)
-      }
 
       return { success: true, item: finalItem }
     } catch (err) {
@@ -522,7 +719,7 @@ export function ItemProvider({ children }) {
     }
   }
 
-  // Update item details (creator only)
+  // Update item details (creator only, supports private and public items)
   async function updateItem(itemId, { title, category, metadata = {} }) {
     if (!user) return { error: 'Must be logged in to edit' }
 
@@ -533,6 +730,61 @@ export function ItemProvider({ children }) {
     const target = items.find(it => it.id === itemId)
     if (!target) return { error: 'Item not found' }
     if (target.created_by !== user.id) return { error: 'You can only edit your own recommendations' }
+
+    if (target.is_private) {
+      if (!vaultKeys?.vaultKey) {
+        return { error: 'Encryption vault is syncing. Please wait a moment.' }
+      }
+      const encrypted = await encryptData({ title: cleanTitle, metadata }, vaultKeys.vaultKey)
+
+      if (!isSupabaseConfigured) {
+        const nextItems = items.map(it => {
+          if (it.id === itemId) {
+            return {
+              ...it,
+              title: cleanTitle,
+              category,
+              metadata,
+              ciphertext: encrypted.ciphertext,
+              iv: encrypted.iv
+            }
+          }
+          return it
+        })
+        setItems(nextItems)
+        localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(nextItems))
+        return { success: true }
+      }
+
+      try {
+        const { error: updErr } = await supabase
+          .from('items')
+          .update({
+            category,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', itemId)
+          .eq('created_by', user.id)
+
+        if (updErr) throw updErr
+
+        setItems(prev => prev.map(it => it.id === itemId ? {
+          ...it,
+          title: cleanTitle,
+          category,
+          metadata,
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv
+        } : it))
+
+        return { success: true }
+      } catch (err) {
+        console.error('Update private item error:', err)
+        return { error: err.message || 'Failed to update private item' }
+      }
+    }
 
     if (!isSupabaseConfigured) {
       const nextItems = items.map(it => {
@@ -581,6 +833,147 @@ export function ItemProvider({ children }) {
         msg = `An item titled "${cleanTitle}" already exists in this category.`
       }
       return { error: msg }
+    }
+  }
+
+  // Toggle recommendation privacy between Public and Private E2EE Vault
+  async function toggleItemPrivacy(itemId) {
+    if (!user) return { error: 'Must be logged in' }
+
+    const target = items.find(it => it.id === itemId)
+    if (!target) return { error: 'Item not found' }
+    if (target.created_by !== user.id) return { error: 'You can only manage your own recommendations' }
+
+    if (target.is_private) {
+      // Transition: Private -> Public
+      const plainTitle = target.title
+      const norm = normalizeTitle(plainTitle)
+
+      const existing = items.find(it => !it.is_private && it.normalized_title === norm && it.category === target.category && it.id !== itemId)
+      if (existing) {
+        return { error: `"${plainTitle}" already exists as a public recommendation in this category.` }
+      }
+
+      if (!isSupabaseConfigured) {
+        setItems(prev => prev.map(it => it.id === itemId ? {
+          ...it,
+          is_private: false,
+          ciphertext: null,
+          iv: null,
+          recommend_count: 1
+        } : it))
+        setUserRecs(prev => new Set(prev).add(itemId))
+        return { success: true }
+      }
+
+      try {
+        const { error: itemErr } = await supabase
+          .from('items')
+          .update({
+            is_private: false,
+            title: plainTitle,
+            normalized_title: norm,
+            ciphertext: null,
+            iv: null,
+            metadata: target.metadata || {},
+            recommend_count: 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', itemId)
+          .eq('created_by', user.id)
+
+        if (itemErr) throw itemErr
+
+        // Add creator upvote
+        await supabase
+          .from('recommendations')
+          .insert({
+            user_id: user.id,
+            item_id: itemId
+          })
+
+        setItems(prev => prev.map(it => it.id === itemId ? {
+          ...it,
+          is_private: false,
+          ciphertext: null,
+          iv: null,
+          recommend_count: 1
+        } : it))
+        setUserRecs(prev => new Set(prev).add(itemId))
+        return { success: true }
+      } catch (err) {
+        console.error('Make public error:', err)
+        return { error: err.message || 'Failed to make recommendation public' }
+      }
+    } else {
+      // Transition: Public -> Private
+      if (!vaultKeys?.vaultKey) {
+        return { error: 'Encryption vault is syncing. Please wait a moment.' }
+      }
+
+      const encrypted = await encryptData({
+        title: target.title,
+        metadata: target.metadata || {}
+      }, vaultKeys.vaultKey)
+
+      if (!isSupabaseConfigured) {
+        setItems(prev => prev.map(it => it.id === itemId ? {
+          ...it,
+          is_private: true,
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv,
+          recommend_count: 0
+        } : it))
+        setUserRecs(prev => {
+          const next = new Set(prev)
+          next.delete(itemId)
+          return next
+        })
+        return { success: true }
+      }
+
+      try {
+        // Delete all public recommendations (votes) for this item
+        await supabase
+          .from('recommendations')
+          .delete()
+          .eq('item_id', itemId)
+
+        const randomSuffix = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)
+        const { error: itemErr } = await supabase
+          .from('items')
+          .update({
+            is_private: true,
+            title: '[Encrypted Item]',
+            normalized_title: 'enc_' + randomSuffix,
+            ciphertext: encrypted.ciphertext,
+            iv: encrypted.iv,
+            metadata: {},
+            recommend_count: 0,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', itemId)
+          .eq('created_by', user.id)
+
+        if (itemErr) throw itemErr
+
+        setItems(prev => prev.map(it => it.id === itemId ? {
+          ...it,
+          is_private: true,
+          ciphertext: encrypted.ciphertext,
+          iv: encrypted.iv,
+          recommend_count: 0
+        } : it))
+        setUserRecs(prev => {
+          const next = new Set(prev)
+          next.delete(itemId)
+          return next
+        })
+        return { success: true }
+      } catch (err) {
+        console.error('Make private error:', err)
+        return { error: err.message || 'Failed to make recommendation private' }
+      }
     }
   }
 
@@ -648,27 +1041,52 @@ export function ItemProvider({ children }) {
     })
   }, [items, profile])
 
-  // Active items filter: MUST have recommend_count >= 1
-  const activeItems = useMemo(() => enrichedItems.filter(it => it.recommend_count >= 1), [enrichedItems])
+  // Active public items filter: MUST be public and have recommend_count >= 1 (Isolates feed from private items)
+  const activeItems = useMemo(
+    () => enrichedItems.filter(it => !it.is_private && it.recommend_count >= 1),
+    [enrichedItems]
+  )
 
-  // Items created by currently logged-in user
-  const myItems = useMemo(() => enrichedItems.filter(it => Boolean(user?.id && it.created_by === user.id)), [enrichedItems, user])
+  // Public items created by currently logged-in user
+  const myItems = useMemo(
+    () => enrichedItems.filter(it => Boolean(user?.id && it.created_by === user.id && !it.is_private)),
+    [enrichedItems, user]
+  )
+
+  // Private E2EE items created by currently logged-in user (Strictly sorted created_at DESC for top-first placement)
+  const myPrivateItems = useMemo(() => {
+    return enrichedItems
+      .filter(it => Boolean(user?.id && it.created_by === user.id && it.is_private))
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return dateB - dateA
+      })
+  }, [enrichedItems, user])
 
   // Items upvoted by user (excluding items they created)
-  const upvotedItems = useMemo(() => enrichedItems.filter(it => Boolean(user?.id && userRecs.has(it.id) && it.created_by !== user.id)), [enrichedItems, user, userRecs])
+  const upvotedItems = useMemo(
+    () => enrichedItems.filter(it => Boolean(user?.id && userRecs.has(it.id) && it.created_by !== user.id && !it.is_private)),
+    [enrichedItems, user, userRecs]
+  )
 
   return (
     <ItemContext.Provider value={{
       items: activeItems,
       rawItems: items,
       myItems,
+      myPrivateItems,
       upvotedItems,
       userRecs,
       loading,
+      vaultKeys,
+      isVaultSyncing,
+      vaultError,
       toggleRecommend,
       addItem,
       updateItem,
       deleteItem,
+      toggleItemPrivacy,
       normalizeTitle
     }}>
       {children}

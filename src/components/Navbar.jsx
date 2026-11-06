@@ -22,6 +22,7 @@ export default function Navbar({
   onOpenProfileModal,
   onOpenSettingsModal,
   onSelectUser,
+  onGoToHome,
 }) {
   const {
     user,
@@ -93,17 +94,21 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/80">
+      <header className="sticky top-0 z-30 bg-[#F7F6F2]/90 backdrop-blur-md border-b border-stone-200">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Brand */}
           <div
-            className="flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="flex items-center gap-2 cursor-pointer shrink-0"
             onClick={() => {
               setSearchQuery("");
-              if (setActiveTab) setActiveTab("feed");
+              if (onGoToHome) {
+                onGoToHome();
+              } else if (setActiveTab) {
+                setActiveTab("feed");
+              }
             }}
           >
-            <span className="font-bold text-sm sm:text-base tracking-tight text-zinc-100 select-none">
+            <span className="font-display font-black text-base sm:text-lg tracking-tight text-zinc-950 select-none">
               recumend
             </span>
           </div>
@@ -113,7 +118,7 @@ export default function Navbar({
             className="flex-1 max-w-xs sm:max-w-md relative min-w-0"
             ref={searchContainerRef}
           >
-            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-500 absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-stone-400 absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
@@ -124,7 +129,7 @@ export default function Navbar({
                 if (!val.trim()) setMatchingUsers([]);
               }}
               placeholder="Search recs or @username..."
-              className="w-full bg-zinc-900/90 border border-zinc-800 pl-8 sm:pl-9 pr-7 sm:pr-8 py-1.5 sm:py-2 text-xs text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors"
+              className="w-full bg-white border border-stone-200 pl-8 sm:pl-9 pr-7 sm:pr-8 py-1.5 sm:py-2 text-xs text-zinc-900 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 shadow-xs transition-colors"
             />
             {searchQuery && (
               <button
@@ -133,7 +138,7 @@ export default function Navbar({
                   setSearchQuery("");
                   setMatchingUsers([]);
                 }}
-                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-zinc-500 hover:text-zinc-300 font-mono"
+                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-stone-400 hover:text-stone-700 font-mono"
               >
                 esc
               </button>
@@ -141,11 +146,11 @@ export default function Navbar({
 
             {/* User Search Dropdown */}
             {searchFocused && searchQuery.trim() && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 shadow-2xl z-50 overflow-hidden divide-y divide-zinc-800/80">
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 shadow-xl rounded-2xl z-50 overflow-hidden divide-y divide-stone-100">
                 {/* If matching profiles found */}
                 {matchingUsers.length > 0 && (
                   <div className="p-1.5 sm:p-2 space-y-1">
-                    <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                    <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-stone-400">
                       Profiles ({matchingUsers.length})
                     </div>
                     {matchingUsers.map((u) => (
@@ -157,27 +162,27 @@ export default function Navbar({
                           setSearchQuery("");
                           onSelectUser?.(u);
                         }}
-                        className="w-full flex items-center justify-between p-2 hover:bg-zinc-800/80 transition-colors text-left group"
+                        className="w-full flex items-center justify-between p-2 hover:bg-stone-50 rounded-xl transition-colors text-left group"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <img
                             src={getAvatarUrl(u.avatar_url, u.display_name || u.username)}
                             alt={u.display_name}
-                            className="w-6 h-6 object-cover border border-zinc-700 shrink-0"
+                            className="w-6 h-6 object-cover border border-stone-200 rounded-full shrink-0"
                             onError={(e) => {
                               e.currentTarget.src = getAvatarUrl(null, u.display_name || u.username);
                             }}
                           />
                           <div className="min-w-0 truncate">
-                            <span className="text-xs font-medium text-zinc-200 group-hover:text-white truncate block">
+                            <span className="text-xs font-medium text-zinc-800 group-hover:text-zinc-950 truncate block">
                               {u.display_name}
                             </span>
-                            <span className="text-[10px] font-mono text-emerald-400">
+                            <span className="text-[10px] font-mono text-emerald-700">
                               @{u.username}
                             </span>
                           </div>
                         </div>
-                        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-300 flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] font-mono text-stone-400 group-hover:text-stone-700 flex items-center gap-1 shrink-0">
                           View profile <ArrowRight className="w-3 h-3" />
                         </span>
                       </button>
@@ -187,13 +192,13 @@ export default function Navbar({
 
                 {/* Feed Items Filter Option */}
                 <div
-                  className="p-2.5 px-3 hover:bg-zinc-800/50 cursor-pointer flex items-center justify-between text-xs text-zinc-400 hover:text-zinc-200"
+                  className="p-2.5 px-3 hover:bg-stone-50 cursor-pointer flex items-center justify-between text-xs text-stone-600 hover:text-zinc-900"
                   onClick={() => setSearchFocused(false)}
                 >
                   <span className="truncate">
                     Filter for "<strong>{searchQuery}</strong>"
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-600 shrink-0 ml-2">
+                  <span className="text-[10px] font-mono text-stone-400 shrink-0 ml-2">
                     Enter
                   </span>
                 </div>
@@ -208,18 +213,18 @@ export default function Navbar({
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-2 p-1 hover:bg-zinc-900 border border-zinc-800/80 transition-colors"
+                  className="flex items-center gap-2 p-1 hover:bg-stone-100 border border-stone-200 rounded-xl transition-colors"
                   title={`Logged in as @${profile.username}`}
                 >
                   <img
                     src={getAvatarUrl(profile.avatar_url, profile.display_name || profile.username)}
                     alt={profile.display_name}
-                    className="w-7 h-7 object-cover border border-zinc-700"
+                    className="w-7 h-7 object-cover border border-stone-200 rounded-full"
                     onError={(e) => {
                       e.currentTarget.src = getAvatarUrl(null, profile.display_name || profile.username);
                     }}
                   />
-                  <span className="text-xs font-medium text-zinc-300 hidden md:inline pr-1 font-mono">
+                  <span className="text-xs font-medium text-zinc-700 hidden md:inline pr-1 font-mono">
                     @{profile.username}
                   </span>
                 </button>
@@ -230,10 +235,13 @@ export default function Navbar({
                       className="fixed inset-0 z-40"
                       onClick={() => setDropdownOpen(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-800 p-1.5 shadow-2xl z-50 text-xs space-y-0.5">
-                      <div className="px-3 py-2 border-b border-zinc-800/80">
-                        <p className="font-semibold text-zinc-200 truncate">
+                    <div className="absolute right-0 mt-2 w-52 bg-white border border-stone-200 p-1.5 shadow-xl rounded-2xl z-50 text-xs space-y-0.5">
+                      <div className="px-3 py-2 border-b border-stone-100">
+                        <p className="font-semibold text-zinc-900 truncate">
                           {profile.display_name}
+                        </p>
+                        <p className="text-[11px] font-mono text-stone-500 truncate">
+                          @{profile.username}
                         </p>
                       </div>
 
@@ -243,9 +251,9 @@ export default function Navbar({
                           setDropdownOpen(false);
                           if (setActiveTab) setActiveTab("my-recs");
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800/70 text-left transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
                       >
-                        <Bookmark className="w-3.5 h-3.5 text-emerald-400" />
+                        <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
                         My Recommendations
                       </button>
 
@@ -255,9 +263,9 @@ export default function Navbar({
                           setDropdownOpen(false);
                           onOpenProfileModal();
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800/70 text-left transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
                       >
-                        <User className="w-3.5 h-3.5 text-zinc-400" />
+                        <User className="w-3.5 h-3.5 text-stone-500" />
                         Public Profile
                       </button>
 
@@ -267,9 +275,9 @@ export default function Navbar({
                           setDropdownOpen(false);
                           onOpenSettingsModal();
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-zinc-300 hover:text-white hover:bg-zinc-800/70 text-left transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
                       >
-                        <Settings className="w-3.5 h-3.5 text-zinc-400" />
+                        <Settings className="w-3.5 h-3.5 text-stone-500" />
                         Account Settings
                       </button>
 
@@ -279,7 +287,7 @@ export default function Navbar({
                           setDropdownOpen(false);
                           signOut();
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-rose-400 hover:bg-rose-500/10 text-left transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-left transition-colors"
                       >
                         <LogOut className="w-3.5 h-3.5" />
                         Sign Out
@@ -293,11 +301,11 @@ export default function Navbar({
                 type="button"
                 onClick={handleGoogleClick}
                 disabled={isAuthenticating}
-                className="flex items-center gap-1.5 sm:gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-not-allowed border border-zinc-800 hover:border-zinc-700 text-zinc-100 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 transition-all shadow-sm shrink-0 min-h-[36px]"
+                className="flex items-center gap-1.5 sm:gap-2 bg-white hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed border border-stone-200 hover:border-stone-300 text-zinc-800 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all shadow-xs shrink-0 min-h-[36px]"
               >
                 {isAuthenticating ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400 shrink-0" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
                     <span>Connecting...</span>
                   </>
                 ) : (
@@ -332,15 +340,15 @@ export default function Navbar({
 
       {/* Auth Error Banner with Dismiss */}
       {authError && (
-        <div className="bg-rose-950/80 border-b border-rose-900/60 px-3 sm:px-4 py-2 text-rose-300 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
+        <div className="bg-rose-50 border-b border-rose-200 px-3 sm:px-4 py-2 text-rose-800 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
           <div className="flex items-center gap-2 max-w-4xl mx-auto flex-1 min-w-0">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span className="truncate">{authError}</span>
           </div>
           <button
             type="button"
             onClick={clearAuthError}
-            className="p-1 hover:bg-rose-900/40 text-rose-400 hover:text-rose-200 transition-colors shrink-0"
+            className="p-1 hover:bg-rose-100 text-rose-700 rounded-md transition-colors shrink-0"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />

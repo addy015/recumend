@@ -58,7 +58,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
     if (extra.trim()) {
       const val = extra.trim()
       if (category === 'yt' || (category === 'app' && (val.includes('.') || /^https?:\/\//i.test(val)))) {
-        metadata.channel_link = /^https?:\/\//i.test(val) ? val : `https://${val}`
+        metadata.channel_link = val
         delete metadata.author
         delete metadata.platform
       } else if (category === 'book') {
@@ -95,17 +95,18 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-zinc-900 border border-zinc-800 p-4 sm:p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
           <div>
-            <h2 className="text-base font-bold text-zinc-100">Edit Recommendation</h2>
-            <p className="text-xs text-zinc-400">Updates will reflect live across the entire community</p>
+            <h2 className="font-display text-base font-bold text-zinc-950">Edit Recommendation</h2>
+            <p className="text-xs text-stone-500">Updates will reflect live across the entire community</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -114,7 +115,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
         <form onSubmit={handleSave} className="space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Title / Name
             </label>
             <input
@@ -122,13 +123,13 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 px-3.5 py-2.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2.5 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Category
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -137,10 +138,10 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                   key={cat.id}
                   type="button"
                   onClick={() => setCategory(cat.id)}
-                  className={`py-2 px-2 text-xs font-medium border text-center transition-all ${
+                  className={`py-2 px-2 text-xs font-medium border text-center rounded-xl transition-all cursor-pointer ${
                     category === cat.id
-                      ? 'bg-zinc-100 text-zinc-950 border-zinc-100 font-semibold'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      ? 'bg-zinc-950 text-white border-zinc-950 font-semibold shadow-xs'
+                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 hover:text-zinc-950'
                   }`}
                 >
                   {cat.label}
@@ -152,8 +153,8 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
           {/* Custom Category Input if 'other' is selected */}
           {category === 'other' && (
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
-                Custom Category Label <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+                Custom Category Label <span className="text-[#2D6A4F]">*</span>
               </label>
               <input
                 type="text"
@@ -161,14 +162,14 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
                 placeholder="e.g. Podcast, Course, Hardware, Tool, Newsletter..."
-                className="w-full bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+                className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
               />
             </div>
           )}
 
           {/* Extra Details */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               {category === 'yt'
                 ? 'Channel Link'
                 : category === 'book'
@@ -190,13 +191,13 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                   ? 'https://... or Play Store / App Store'
                   : 'e.g. Netflix, Steam, HBO'
               }
-              className="w-full bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500"
+              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
             />
           </div>
 
           {/* Reason / Note */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Description of your recommendation
             </label>
             <textarea
@@ -204,34 +205,36 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="What makes this worth someone's time?"
-              className="w-full bg-zinc-950 border border-zinc-800 px-3.5 py-2 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none"
+              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors resize-none"
             />
           </div>
 
           {/* Feedback message */}
           {status && (
-            <div className={`p-2.5 text-xs font-medium ${
+            <div className={`p-2.5 text-xs font-medium rounded-xl ${
               status.type === 'error'
-                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                : status.type === 'loading'
+                ? 'bg-stone-100 text-stone-700 border border-stone-200'
+                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
             }`}>
               {status.msg}
             </div>
           )}
 
           {/* Footer buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-1.5 px-4 py-2 bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save Changes</span>
