@@ -53,7 +53,16 @@ function getInitialMockState() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => (!isSupabaseConfigured ? getInitialMockState().user : null))
   const [profile, setProfile] = useState(() => (!isSupabaseConfigured ? getInitialMockState().profile : null))
-  const [providerToken, setProviderToken] = useState(null)
+  const [providerToken, setProviderToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('recumend_google_provider_token') || null
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [authError, setAuthError] = useState(getInitialAuthError)
@@ -167,8 +176,15 @@ export function AuthProvider({ children }) {
         }
         if (session?.user) {
           setUser(session.user)
-          if (session.provider_token) {
-            setProviderToken(session.provider_token)
+          const storedToken = typeof window !== 'undefined' ? localStorage.getItem('recumend_google_provider_token') : null
+          const activeToken = session.provider_token || storedToken
+          if (activeToken) {
+            setProviderToken(activeToken)
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem('recumend_google_provider_token', activeToken)
+              } catch {}
+            }
           }
           await fetchProfile(session.user)
         }
@@ -187,6 +203,11 @@ export function AuthProvider({ children }) {
         setUser(session.user)
         if (session.provider_token) {
           setProviderToken(session.provider_token)
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('recumend_google_provider_token', session.provider_token)
+            } catch {}
+          }
         }
         setIsAuthenticating(false)
         setAuthError(null)
@@ -204,6 +225,11 @@ export function AuthProvider({ children }) {
         setProfile(null)
         setProviderToken(null)
         clearCachedVaultKeys()
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('recumend_google_provider_token')
+          } catch {}
+        }
         setIsAuthenticating(false)
       }
       setLoading(false)
@@ -376,6 +402,11 @@ export function AuthProvider({ children }) {
     setAuthError(null)
     setProviderToken(null)
     clearCachedVaultKeys()
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('recumend_google_provider_token')
+      } catch {}
+    }
     if (!isSupabaseConfigured) {
       localStorage.removeItem(MOCK_STORAGE_KEY)
       setUser(null)

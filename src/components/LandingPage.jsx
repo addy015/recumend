@@ -1,13 +1,30 @@
-import React from 'react'
-import { ArrowRight, CheckCircle2, Loader2 } from 'lucide-react'
+import React, { useState } from 'react'
+import {
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  Bookmark,
+  User,
+  Settings,
+  LogOut,
+  TrendingUp
+} from 'lucide-react'
+import { getAvatarUrl } from '../lib/avatar'
 
 export default function LandingPage({
   onBegin,
   onExploreFeed,
   user,
+  profile,
   onGoogleSignIn,
+  onSignOut,
+  onOpenSettingsModal,
+  onOpenProfileModal,
+  onOpenMyRecs,
   isAuthenticating,
 }) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
   return (
     <div className="min-h-screen bg-[#F7F6F2] text-[#1C1917] flex flex-col font-body selection:bg-stone-200 selection:text-stone-900">
       {/* Top Header Bar */}
@@ -20,15 +37,110 @@ export default function LandingPage({
           </div>
 
           <div className="flex items-center gap-3">
-            {user ? (
-              <button
-                type="button"
-                onClick={onBegin}
-                className="inline-flex items-center gap-2 bg-zinc-950 hover:bg-zinc-800 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-xs"
-              >
-                <span>Go to Feed</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+            {user && profile ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 p-1 hover:bg-stone-100 border border-stone-200 rounded-xl transition-colors cursor-pointer"
+                  title={`Logged in as @${profile.username}`}
+                >
+                  <img
+                    src={getAvatarUrl(profile.avatar_url, profile.display_name || profile.username)}
+                    alt={profile.display_name}
+                    className="w-7 h-7 object-cover border border-stone-200 rounded-full"
+                    onError={(e) => {
+                      e.currentTarget.src = getAvatarUrl(null, profile.display_name || profile.username)
+                    }}
+                  />
+                  <span className="text-xs font-medium text-zinc-700 hidden sm:inline pr-1 font-mono">
+                    @{profile.username}
+                  </span>
+                </button>
+
+                {dropdownOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setDropdownOpen(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-52 bg-white border border-stone-200 p-1.5 shadow-xl rounded-2xl z-50 text-xs space-y-0.5">
+                      <div className="px-3 py-2 border-b border-stone-100">
+                        <p className="font-semibold text-zinc-900 truncate">
+                          {profile.display_name}
+                        </p>
+                        <p className="text-[11px] font-mono text-stone-500 truncate">
+                          @{profile.username}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          onBegin?.()
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors cursor-pointer font-medium"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-zinc-700" />
+                        Go to Feed
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          onOpenMyRecs?.()
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors cursor-pointer"
+                      >
+                        <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
+                        My Recommendations
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          onOpenProfileModal?.()
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors cursor-pointer"
+                      >
+                        <User className="w-3.5 h-3.5 text-stone-500" />
+                        Public Profile
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          onOpenSettingsModal?.()
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-stone-500" />
+                        Account Settings
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false)
+                          onSignOut?.()
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-left transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : user ? (
+              <div className="flex items-center gap-2 p-1 border border-stone-200 rounded-xl">
+                <div className="w-7 h-7 rounded-full bg-stone-200 animate-pulse" />
+              </div>
             ) : (
               <button
                 type="button"

@@ -8,7 +8,7 @@ import MyRecommendations from './components/MyRecommendations'
 import AddRecommendationModal from './components/AddRecommendationModal'
 import SettingsModal from './components/SettingsModal'
 import UserProfileView from './components/UserProfileView'
-import PrivacyPolicy from './components/PrivacyPolicy'
+import LegalView from './components/LegalView'
 import { TrendingUp, Bookmark } from 'lucide-react'
 
 // Lightweight SPA routing helper
@@ -56,7 +56,7 @@ function getRoute() {
 
 function MainContent() {
   const { myItems, upvotedItems = [] } = useItems()
-  const { user, profile, signInWithGoogle, isAuthenticating } = useAuth()
+  const { user, profile, signInWithGoogle, signOut, isAuthenticating } = useAuth()
 
   // Track active route derived from URL (path / hash)
   const [route, setRoute] = useState(getRoute)
@@ -72,6 +72,7 @@ function MainContent() {
 
   // Modal open states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [addModalInitialPrivate, setAddModalInitialPrivate] = useState(false)
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   // Listen to browser navigation (back/forward and custom navigate events)
@@ -102,11 +103,12 @@ function MainContent() {
   }, [])
 
   // Open add modal or prompt Google login if guest
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (options = {}) => {
     if (!user) {
       signInWithGoogle()
       return
     }
+    setAddModalInitialPrivate(Boolean(options?.isPrivate))
     setIsAddModalOpen(true)
   }
 
@@ -118,7 +120,16 @@ function MainContent() {
           onBegin={() => navigate('/feed')}
           onExploreFeed={() => navigate('/feed')}
           user={user}
+          profile={profile}
           onGoogleSignIn={signInWithGoogle}
+          onSignOut={signOut}
+          onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+          onOpenProfileModal={() => {
+            if (profile?.username) {
+              navigate(`/u/${profile.username}`)
+            }
+          }}
+          onOpenMyRecs={() => navigate('/feed#/my-recs')}
           isAuthenticating={isAuthenticating}
         />
         <SettingsModal
@@ -163,7 +174,7 @@ function MainContent() {
       {/* Main Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {route.page === 'privacy' ? (
-          <PrivacyPolicy onBack={() => navigate('/')} />
+          <LegalView onBack={() => navigate('/')} />
         ) : route.page === 'profile' && route.username ? (
           <UserProfileView
             username={route.username}
@@ -269,6 +280,7 @@ function MainContent() {
       {/* Modals */}
       <AddRecommendationModal
         isOpen={isAddModalOpen}
+        initialPrivate={addModalInitialPrivate}
         onClose={() => setIsAddModalOpen(false)}
       />
 

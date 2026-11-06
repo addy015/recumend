@@ -1,23 +1,22 @@
-// Google Drive REST API Integration for Hidden AppDataFolder
-// Silently fetches or creates the user's master encryption file (recumend_vault.json).
+// Automatically derives a deterministic AES-256 vault key for each user using
+// PBKDF2 (100,000 iterations with SHA-256).
 //
-// Files saved here cannot be seen, edited, or accidentally deleted by the user inside drive.google.com,
-// and other Google Drive apps cannot access it.
-
+// This guarantees:
+// 1. Same key on all devices, browsers (Safari, Chrome, Firefox, Edge, Mobile),
+//    ports (5173, 5174), and domains (localhost, recumend.vercel.app).
+// 2. Zero network requests/403 errors/network timeouts.
+// 3. Backward-compatible fallback for previously encrypted items.
 import {
-  generateUnifiedVaultKeys,
-  exportVaultBundle,
+  deriveDeterministicVaultKey,
   importVaultBundle
 } from './vaultCrypto.js'
 
-// Name of the master vault file inside Google Drive AppData
-const VAULT_FILE_NAME = 'recumend_vault.json'
+// Legacy fallback storage key
+const LEGACY_VAULT_STORAGE_KEY = 'recumend_mock_vault_bundle'
 
-// Local storage key used when running offline or in demo mode without Google login
-const MOCK_VAULT_STORAGE_KEY = 'recumend_mock_vault_bundle'
-
-// In-memory cache so we only fetch/decrypt the vault keys once per browser session
+// In-memory cache so derivation only occurs once per user session
 let cachedVaultKeys = null
+let cachedUserId = null
 
 // Returns the cached keys if already loaded in this session
 export function getCachedVaultKeys() {
@@ -27,188 +26,56 @@ export function getCachedVaultKeys() {
 // Clears the cached keys (used on user logout)
 export function clearCachedVaultKeys() {
   cachedVaultKeys = null
+  cachedUserId = null
 }
 
 // ----------------------------------------------------------------------------
-// Step 1: Search for Existing Vault File in Google Drive
-// Looks inside the user's hidden 'appDataFolder' to see if 'recumend_vault.json' already exists.
+// Automatic Vault Synchronization
+// Called on user login or session initialization.
 // ----------------------------------------------------------------------------
-async function findVaultFile(providerToken) {
-  const query = encodeURIComponent(`name='${VAULT_FILE_NAME}' and trashed=false`)
-  const url = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${query}&fields=files(id,name)`
+export async function syncUnifiedVault(arg1, arg2) {
+  let user = null
+  let onPublicKeyReady = null
 
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${providerToken}`,
-      Accept: 'application/json'
-    }
-  })
-
-  if (!res.ok) {
-    const errorText = await res.text()
-    throw new Error(`Google Drive search failed (${res.status}): ${errorText}`)
+  if (arg1 && typeof arg1 === 'object' && !('byteLength' in arg1) && ('user' in arg1 || 'onPublicKeyReady' in arg1)) {
+    user = arg1.user || null
+    onPublicKeyReady = arg1.onPublicKeyReady || null
+  } else {
+    onPublicKeyReady = arg2 || null
   }
 
-  const data = await res.json()
-  // Return file metadata if found, otherwise null
-  return data.files && data.files.length > 0 ? data.files[0] : null
-}
+  const userId = user?.id || 'demo_user'
 
-// ----------------------------------------------------------------------------
-// Step 2: Download Vault File Content from Google Drive
-// Fetches the raw JSON string from the user's Google Drive file ID.
-// ----------------------------------------------------------------------------
-async function downloadVaultFile(providerToken, fileId) {
-  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${providerToken}`,
-      Accept: 'application/json'
-    }
-  })
-
-  if (!res.ok) {
-    const errorText = await res.text()
-    throw new Error(`Google Drive download failed (${res.status}): ${errorText}`)
-  }
-
-  return await res.text()
-}
-
-// ----------------------------------------------------------------------------
-// Step 3: Upload New Vault File to Google Drive (Multipart Request)
-// Creates a new file in 'appDataFolder' containing both file metadata and JSON file contents.
-// ----------------------------------------------------------------------------
-async function uploadVaultFile(providerToken, bundleJsonString) {
-  const boundary = '-------RecumendVaultBoundary' + Math.random().toString(36).substring(2)
-  const delimiter = `\r\n--${boundary}\r\n`
-  const closeDelimiter = `\r\n--${boundary}--`
-
-  // Metadata specifies the filename and that it belongs in the hidden appDataFolder
-  const metadata = {
-    name: VAULT_FILE_NAME,
-    parents: ['appDataFolder']
-  }
-
-  // Combine metadata part and file content part into a multipart payload
-  const multipartRequestBody =
-    delimiter +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify(metadata) +
-    delimiter +
-    'Content-Type: application/json\r\n\r\n' +
-    bundleJsonString +
-    closeDelimiter
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${providerToken}`,
-      'Content-Type': `multipart/related; boundary=${boundary}`
-    },
-    body: multipartRequestBody
-  })
-
-  if (!res.ok) {
-    const errorText = await res.text()
-    throw new Error(`Google Drive upload failed (${res.status}): ${errorText}`)
-  }
-
-  return await res.json()
-}
-
-// ----------------------------------------------------------------------------
-// Step 4: Local Fallback for Offline or Demo Mode
-// If the user is running without Google login, saves keys safely in browser localStorage.
-// ----------------------------------------------------------------------------
-async function syncMockLocalVault(onPublicKeyReady) {
-  try {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(MOCK_VAULT_STORAGE_KEY) : null
-    if (stored) {
-      const keys = await importVaultBundle(stored)
-      cachedVaultKeys = keys
-      if (onPublicKeyReady && keys.publicKeyJwkString) {
-        onPublicKeyReady(keys.publicKeyJwkString)
-      }
-      return keys
-    }
-
-    // Generate fresh demo keys if none exist in localStorage
-    const generated = await generateUnifiedVaultKeys()
-    const bundleJson = await exportVaultBundle(generated)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(MOCK_VAULT_STORAGE_KEY, bundleJson)
-    }
-
-    const imported = await importVaultBundle(bundleJson)
-    cachedVaultKeys = imported
-    if (onPublicKeyReady && imported.publicKeyJwkString) {
-      onPublicKeyReady(imported.publicKeyJwkString)
-    }
-    return imported
-  } catch (err) {
-    console.error('Mock vault initialization error:', err)
-    throw err
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Step 5: Main Orchestrator (Called on User Login)
-// Checks if vault already exists in Google Drive:
-// - If yes: Downloads it and restores keys.
-// - If no: Generates fresh keys, uploads them to Google Drive, and saves public key to profile.
-// ----------------------------------------------------------------------------
-export async function syncUnifiedVault(providerToken, onPublicKeyReady) {
-  // If keys are already in memory for this session, return them immediately
-  if (cachedVaultKeys) {
+  // Return memory cached keys immediately if user matches
+  if (cachedVaultKeys && cachedUserId === userId) {
     return cachedVaultKeys
   }
 
-  // If no Google provider token is available, use local fallback
-  if (!providerToken) {
-    return await syncMockLocalVault(onPublicKeyReady)
-  }
+  // 1. Derive deterministic personal vault key for this user
+  const vaultKey = await deriveDeterministicVaultKey(userId)
 
-  try {
-    // 1. Check if vault file already exists in Google Drive AppData
-    const existingFile = await findVaultFile(providerToken)
-
-    if (existingFile) {
-      // 2. Download existing vault and import keys
-      const downloadedJson = await downloadVaultFile(providerToken, existingFile.id)
-      const keys = await importVaultBundle(downloadedJson)
-      cachedVaultKeys = keys
-
-      // Notify profile to store public key for peer-to-peer sharing
-      if (onPublicKeyReady && keys.publicKeyJwkString) {
-        onPublicKeyReady(keys.publicKeyJwkString)
+  // 2. Load any legacy local bundle as fallback key so previously encrypted items still decrypt
+  const fallbackKeys = []
+  if (typeof window !== 'undefined') {
+    const legacySaved = localStorage.getItem(`recumend_vault_${userId}`) || localStorage.getItem(LEGACY_VAULT_STORAGE_KEY)
+    if (legacySaved) {
+      try {
+        const legacy = await importVaultBundle(legacySaved)
+        if (legacy?.vaultKey) {
+          fallbackKeys.push(legacy.vaultKey)
+        }
+      } catch {
+        // ignore legacy parse errors
       }
-      return keys
     }
-
-    // 3. First time user: generate fresh keys and upload to Google Drive
-    const generated = await generateUnifiedVaultKeys()
-    const bundleJson = await exportVaultBundle(generated)
-
-    await uploadVaultFile(providerToken, bundleJson)
-
-    const imported = await importVaultBundle(bundleJson)
-    cachedVaultKeys = imported
-
-    if (onPublicKeyReady && imported.publicKeyJwkString) {
-      onPublicKeyReady(imported.publicKeyJwkString)
-    }
-    return imported
-  } catch (err) {
-    console.error('Unified vault synchronization error:', err)
-    // If Google Drive API errors out (e.g. temporary network issue), fall back gracefully to local session
-    if (err.message?.includes('Google Drive')) {
-      console.warn('Falling back to local session vault due to Google Drive API error')
-      return await syncMockLocalVault(onPublicKeyReady)
-    }
-    throw err
   }
+
+  const result = {
+    vaultKey,
+    fallbackKeys
+  }
+
+  cachedVaultKeys = result
+  cachedUserId = userId
+  return result
 }

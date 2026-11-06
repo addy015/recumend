@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { X, Plus, Check, AlertCircle, Lock } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
 import { CATEGORIES } from '../constants/categories'
 
 // Modal dialog for submitting a new recommendation or upvoting existing matches
-export default function AddRecommendationModal({ isOpen, onClose }) {
+export default function AddRecommendationModal({ isOpen, onClose, initialPrivate = false }) {
   const { items, addItem, toggleRecommend, userRecs, normalizeTitle } = useItems()
   const { user, signInWithGoogle } = useAuth()
 
@@ -15,10 +15,17 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
   const [customCategory, setCustomCategory] = useState('')
   const [note, setNote] = useState('')
   const [linkOrExtra, setLinkOrExtra] = useState('')
-  const [isPrivate, setIsPrivate] = useState(false)
+  const [isPrivate, setIsPrivate] = useState(Boolean(initialPrivate))
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [duplicateCandidate, setDuplicateCandidate] = useState(null)
+
+  // Sync isPrivate when modal opens or initialPrivate changes
+  useEffect(() => {
+    if (isOpen) {
+      setIsPrivate(Boolean(initialPrivate))
+    }
+  }, [isOpen, initialPrivate])
 
   // Clear inputs and error messages
   const resetForm = () => {
@@ -27,7 +34,7 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
     setCustomCategory('')
     setNote('')
     setLinkOrExtra('')
-    setIsPrivate(false)
+    setIsPrivate(Boolean(initialPrivate))
     setStatus(null)
     setIsSubmitting(false)
     setDuplicateCandidate(null)
@@ -40,11 +47,11 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
 
   // Find matching items in real time while user is typing
   const matchingExistingItems = useMemo(() => {
-    if (isSubmitting || duplicateCandidate) return []
+    if (isSubmitting || duplicateCandidate || isPrivate) return []
     if (!title.trim() || title.trim().length < 2) return []
     const norm = normalizeTitle(title)
     return items.filter(it => it.normalized_title.includes(norm) || norm.includes(it.normalized_title))
-  }, [title, items, normalizeTitle, isSubmitting, duplicateCandidate])
+  }, [title, items, normalizeTitle, isSubmitting, duplicateCandidate, isPrivate])
 
   if (!isOpen) return null
 
@@ -229,10 +236,12 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Title Input */}
             <div>
-              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="add-rec-title" className="block text-xs font-semibold text-zinc-800 mb-1.5">
                 Title / Name
               </label>
               <input
+                id="add-rec-title"
+                name="title"
                 type="text"
                 required
                 value={title}
@@ -304,10 +313,12 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
             {/* Custom Category Input if 'other' is selected */}
             {category === 'other' && (
               <div>
-                <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+                <label htmlFor="add-rec-custom-category" className="block text-xs font-semibold text-zinc-800 mb-1.5">
                   Custom Category Label <span className="text-[#2D6A4F]">*</span>
                 </label>
                 <input
+                  id="add-rec-custom-category"
+                  name="customCategory"
                   type="text"
                   required
                   value={customCategory}
@@ -320,7 +331,7 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
 
             {/* Extra Details */}
             <div>
-              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="add-rec-extra" className="block text-xs font-semibold text-zinc-800 mb-1.5">
                 {category === 'yt'
                   ? 'Channel Link'
                   : category === 'book'
@@ -330,6 +341,8 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
                   : 'Platform / Source (optional)'}
               </label>
               <input
+                id="add-rec-extra"
+                name="linkOrExtra"
                 type="text"
                 value={linkOrExtra}
                 onChange={(e) => setLinkOrExtra(e.target.value)}
@@ -348,10 +361,12 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
 
             {/* User Review / Note */}
             <div>
-              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="add-rec-note" className="block text-xs font-semibold text-zinc-800 mb-1.5">
                 Description of your recommendation
               </label>
               <textarea
+                id="add-rec-note"
+                name="note"
                 rows={2}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -361,18 +376,24 @@ export default function AddRecommendationModal({ isOpen, onClose }) {
             </div>
 
             {/* Private Watchlist Checkbox Toggle */}
-            <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl">
-              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <div className={`p-3 border rounded-xl transition-all duration-150 ${
+              isPrivate
+                ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
+                : 'bg-stone-50 border-stone-200'
+            }`}>
+              <label htmlFor="add-rec-private-toggle" className="flex items-start gap-2.5 cursor-pointer select-none">
                 <input
+                  id="add-rec-private-toggle"
+                  name="isPrivate"
                   type="checkbox"
                   checked={isPrivate}
                   onChange={(e) => setIsPrivate(e.target.checked)}
-                  className="mt-0.5 rounded border-stone-300 text-zinc-950 focus:ring-0 cursor-pointer"
+                  className="mt-0.5 rounded border-stone-300 text-emerald-700 focus:ring-0 cursor-pointer"
                 />
                 <div className="flex-1">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900">
-                    <Lock className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Save as Private (E2EE Vault)</span>
+                    <Lock className={`w-3.5 h-3.5 transition-colors ${isPrivate ? 'text-emerald-700' : 'text-stone-500'}`} />
+                    <span className={isPrivate ? 'text-emerald-950 font-bold' : ''}>Save as Private (E2EE Vault)</span>
                   </div>
                   <p className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">
                     Encrypted client-side with your Google Drive key. Hidden from the public feed and database admins.

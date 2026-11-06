@@ -2,37 +2,45 @@
 // Handles client-side encryption for personal private recommendations
 // and prepares ECDH key derivation for friend-to-friend sharing.
 
-// Helper: Safely access the browser or runtime's built-in Web Crypto engine
+// Helper: Safely access the browser or runtime's built-in Web Crypto engine with subtle crypto check
 function getCrypto() {
-  if (typeof window !== 'undefined' && window.crypto) {
-    return window.crypto
+  const c = typeof window !== 'undefined' ? window.crypto : (typeof globalThis !== 'undefined' ? globalThis.crypto : null)
+  if (c && c.subtle) {
+    return c
   }
-  if (typeof globalThis !== 'undefined' && globalThis.crypto) {
-    return globalThis.crypto
-  }
-  throw new Error('Web Crypto API is not available in this environment')
+  throw new Error('Web Crypto API (crypto.subtle) is not available. Please ensure you are accessing via HTTPS or localhost.')
 }
 
 // Helper: Convert raw binary memory buffers into standard Base64 text (for JSON and database storage)
 export function bufferToBase64(buffer) {
+  if (!buffer) return ''
   if (typeof Buffer !== 'undefined') {
     return Buffer.from(buffer).toString('base64')
   }
-  const bytes = new Uint8Array(buffer)
+  const bytes = new Uint8Array(
+    buffer instanceof ArrayBuffer 
+      ? buffer 
+      : (buffer.buffer ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) : buffer)
+  )
   let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i])
+  const chunkSize = 8192
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode.apply(null, chunk)
   }
   return window.btoa(binary)
 }
 
-// Helper: Convert Base64 text back into raw binary memory buffers
+// Helper: Convert Base64 text back into raw binary memory buffers (resilient to whitespace, url-safe chars, and missing padding)
 export function base64ToBuffer(base64) {
+  if (!base64 || typeof base64 !== 'string') return new ArrayBuffer(0)
+  const clean = base64.trim().replace(/-/g, '+').replace(/_/g, '/')
+  const padded = clean.padEnd(clean.length + ((4 - (clean.length % 4)) % 4), '=')
   if (typeof Buffer !== 'undefined') {
-    const buf = Buffer.from(base64, 'base64')
+    const buf = Buffer.from(padded, 'base64')
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   }
-  const binary = window.atob(base64)
+  const binary = window.atob(padded)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i)
@@ -42,7 +50,7 @@ export function base64ToBuffer(base64) {
 
 // Helper: Convert a byte array into Base64
 export function uint8ArrayToBase64(uint8) {
-  return bufferToBase64(uint8.buffer.slice(uint8.byteOffset, uint8.byteOffset + uint8.byteLength))
+  return bufferToBase64(uint8)
 }
 
 // Helper: Convert Base64 back into a byte array
@@ -171,29 +179,71 @@ export async function encryptData(data, cryptoKey) {
   }
 }
 
+// Derives deterministic AES-256 Vault Key from User ID using PBKDF2 (100k iterations)
+// Guarantees exact same key on all devices, browsers, and origins without manual sync!
+export async function deriveDeterministicVaultKey(userId) {
+  const crypto = getCrypto()
+  const cleanId = String(userId || 'default_user_vault')
+  const salt = new TextEncoder().encode(`recumend_deterministic_salt_v1_${cleanId}`)
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(cleanId),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  )
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  )
+}
+
 // ----------------------------------------------------------------------------
 // Step 5: Decrypt an Item
 // Takes ciphertext and IV, and decrypts back into original plaintext data.
 // AES-GCM is an authenticated cipher: if anyone modifies or tampers with the ciphertext,
 // this will automatically fail and throw an error to prevent forgery.
 // ----------------------------------------------------------------------------
-export async function decryptData(ciphertextBase64, ivBase64, cryptoKey) {
+export async function decryptData(ciphertextBase64, ivBase64, cryptoKey, fallbackKeys = []) {
+  if (!ciphertextBase64 || !ivBase64 || !cryptoKey) {
+    throw new Error('Missing ciphertext, iv, or cryptoKey for decryption')
+  }
   const crypto = getCrypto()
   const ciphertext = base64ToBuffer(ciphertextBase64)
   const iv = base64ToUint8Array(ivBase64)
 
-  const decryptedBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    ciphertext
-  )
+  const allKeys = [cryptoKey, ...(Array.isArray(fallbackKeys) ? fallbackKeys : [])].filter(Boolean)
+  let lastError = null
 
-  const decryptedStr = new TextDecoder().decode(decryptedBuffer)
-  try {
-    return JSON.parse(decryptedStr)
-  } catch {
-    return decryptedStr
+  for (const key of allKeys) {
+    try {
+      const decryptedBuffer = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        ciphertext
+      )
+
+      const decryptedStr = new TextDecoder().decode(decryptedBuffer)
+      try {
+        return JSON.parse(decryptedStr)
+      } catch {
+        return decryptedStr
+      }
+    } catch (err) {
+      lastError = err
+    }
   }
+
+  throw lastError || new Error('Decryption failed with all available keys')
 }
 
 // ----------------------------------------------------------------------------

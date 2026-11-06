@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { syncUnifiedVault } from '../lib/googleDriveVault'
@@ -95,12 +95,20 @@ export function ItemProvider({ children }) {
   // Synchronize unified encryption vault (AES-256 for personal vault + ECDH P-256 for peer sharing)
   useEffect(() => {
     let isMounted = true
-    if (!user?.id) return
+    if (!user?.id) {
+      setVaultKeys(null)
+      setIsVaultSyncing(false)
+      return
+    }
 
     setIsVaultSyncing(true)
     setVaultError(null)
 
-    syncUnifiedVault(providerToken, savePublicKeyToProfile)
+    syncUnifiedVault({
+      user,
+      providerToken,
+      onPublicKeyReady: savePublicKeyToProfile
+    })
       .then((keys) => {
         if (isMounted) {
           setVaultKeys(keys)
@@ -121,43 +129,62 @@ export function ItemProvider({ children }) {
   }, [user?.id, providerToken, savePublicKeyToProfile])
 
   // Helper to decrypt a single private item
-  const decryptSingleItem = async (item, key) => {
+  const decryptSingleItem = async (item, key, fallbackKeys = []) => {
     if (!item?.is_private || !item?.ciphertext || !item?.iv) return item
     try {
-      const dec = await decryptData(item.ciphertext, item.iv, key)
+      const dec = await decryptData(item.ciphertext, item.iv, key, fallbackKeys)
       if (typeof dec === 'object' && dec !== null) {
         return {
           ...item,
           title: dec.title || item.title,
           metadata: { ...(item.metadata || {}), ...(dec.metadata || {}) },
-          _isDecrypted: true
+          _isDecrypted: true,
+          _decryptionFailed: false
         }
       }
       return {
         ...item,
         title: dec,
-        _isDecrypted: true
+        _isDecrypted: true,
+        _decryptionFailed: false
       }
     } catch (err) {
-      console.error('Decryption failed for item:', item.id, err)
+      console.warn('Decryption failed for item:', item.id, err?.message || err)
       return {
         ...item,
-        _decryptionFailed: true
+        _isDecrypted: false,
+        _decryptionFailed: true,
+        _decryptionError: err?.message || 'Decryption failed'
       }
     }
   }
 
-  // Decrypt pending private items whenever vaultKey is initialized or changes
+  // Decrypt pending private items whenever vaultKeys or items change
   useEffect(() => {
     if (!vaultKeys?.vaultKey) return
     let isCancelled = false
 
     async function decryptPendingItems() {
-      const pending = items.filter(it => it.is_private && !it._isDecrypted && it.ciphertext && it.iv)
+      const pending = items.filter(
+        it => it.is_private && !it._isDecrypted && !it._decryptionFailed
+      )
       if (pending.length === 0) return
 
       const decryptedList = await Promise.all(
-        pending.map(it => decryptSingleItem(it, vaultKeys.vaultKey))
+        pending.map(async (it) => {
+          if (!it.ciphertext || !it.iv) {
+            if (it.title && it.title !== '[Encrypted Item]') {
+              return { ...it, _isDecrypted: true, _decryptionFailed: false }
+            }
+            return {
+              ...it,
+              _isDecrypted: false,
+              _decryptionFailed: true,
+              _decryptionError: 'Missing encryption payload'
+            }
+          }
+          return decryptSingleItem(it, vaultKeys.vaultKey, vaultKeys.fallbackKeys || [])
+        })
       )
 
       if (isCancelled) return
@@ -334,7 +361,19 @@ export function ItemProvider({ children }) {
           }
           const itemWithCreator = { ...newItem, creator: creatorData }
           setItems((prev) => {
-            if (prev.some((it) => it.id === newItem.id)) {
+            const existing = prev.find((it) => it.id === newItem.id)
+            if (existing) {
+              // If already decrypted in memory, do NOT overwrite with raw [Encrypted Item] from database
+              if (newItem.is_private && existing._isDecrypted) {
+                return prev.map(it => it.id === newItem.id ? {
+                  ...newItem,
+                  title: existing.title,
+                  metadata: existing.metadata,
+                  _isDecrypted: true,
+                  _decryptionFailed: false,
+                  creator: itemWithCreator.creator || existing.creator
+                } : it)
+              }
               return prev.map(it => it.id === newItem.id ? {
                 ...it,
                 ...itemWithCreator,
@@ -360,6 +399,17 @@ export function ItemProvider({ children }) {
             }
             setItems((prev) => {
               const existing = prev.find((it) => it.id === updated.id)
+              // If already decrypted in memory, do NOT overwrite with [Encrypted Item]
+              if (updated.is_private && existing?._isDecrypted) {
+                return prev.map((it) => (it.id === updated.id ? {
+                  ...updated,
+                  title: existing.title,
+                  metadata: existing.metadata,
+                  _isDecrypted: true,
+                  _decryptionFailed: false,
+                  creator: existing.creator || null
+                } : it))
+              }
               const merged = { ...updated, creator: existing?.creator || null }
               if (existing) {
                 return prev.map((it) => (it.id === updated.id ? merged : it))
@@ -612,6 +662,7 @@ export function ItemProvider({ children }) {
           title: cleanTitle,
           metadata,
           _isDecrypted: true,
+          _decryptionFailed: false,
           creator: profile ? {
             id: profile.id,
             username: profile.username,
@@ -746,7 +797,9 @@ export function ItemProvider({ children }) {
               category,
               metadata,
               ciphertext: encrypted.ciphertext,
-              iv: encrypted.iv
+              iv: encrypted.iv,
+              _isDecrypted: true,
+              _decryptionFailed: false
             }
           }
           return it
@@ -776,7 +829,9 @@ export function ItemProvider({ children }) {
           category,
           metadata,
           ciphertext: encrypted.ciphertext,
-          iv: encrypted.iv
+          iv: encrypted.iv,
+          _isDecrypted: true,
+          _decryptionFailed: false
         } : it))
 
         return { success: true }
@@ -846,6 +901,9 @@ export function ItemProvider({ children }) {
 
     if (target.is_private) {
       // Transition: Private -> Public
+      if (!target._isDecrypted && target.title === '[Encrypted Item]') {
+        return { error: 'Item must be decrypted before making it public.' }
+      }
       const plainTitle = target.title
       const norm = normalizeTitle(plainTitle)
 
@@ -922,7 +980,9 @@ export function ItemProvider({ children }) {
           is_private: true,
           ciphertext: encrypted.ciphertext,
           iv: encrypted.iv,
-          recommend_count: 0
+          recommend_count: 0,
+          _isDecrypted: true,
+          _decryptionFailed: false
         } : it))
         setUserRecs(prev => {
           const next = new Set(prev)
@@ -962,7 +1022,9 @@ export function ItemProvider({ children }) {
           is_private: true,
           ciphertext: encrypted.ciphertext,
           iv: encrypted.iv,
-          recommend_count: 0
+          recommend_count: 0,
+          _isDecrypted: true,
+          _decryptionFailed: false
         } : it))
         setUserRecs(prev => {
           const next = new Set(prev)

@@ -210,12 +210,14 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
         ) : (
           <form onSubmit={handleSave} className="space-y-3">
             <div>
-              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+              <label htmlFor="connect-supabase-url" className="block text-[11px] font-semibold text-zinc-800 mb-1">
                 Project URL (<code className="text-emerald-700 font-mono">VITE_SUPABASE_URL</code>)
               </label>
               <div className="relative">
                 <Globe className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
+                  id="connect-supabase-url"
+                  name="supabaseUrl"
                   type="url"
                   required
                   value={url}
@@ -227,12 +229,14 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+              <label htmlFor="connect-supabase-anon-key" className="block text-[11px] font-semibold text-zinc-800 mb-1">
                 Anon / Public API Key (<code className="text-emerald-700 font-mono">VITE_SUPABASE_ANON_KEY</code>)
               </label>
               <div className="relative">
                 <Key className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
+                  id="connect-supabase-anon-key"
+                  name="supabaseAnonKey"
                   type="text"
                   required
                   value={anonKey}

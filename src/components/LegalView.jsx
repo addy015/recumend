@@ -1,7 +1,7 @@
 import React from 'react'
 import { Lock, ArrowLeft, ExternalLink, Mail, CheckCircle2 } from 'lucide-react'
 
-export default function PrivacyPolicy({ onBack }) {
+export default function LegalView({ onBack }) {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 font-sans text-stone-800">
       <button
@@ -191,3 +191,4 @@ export default function PrivacyPolicy({ onBack }) {
     </div>
   )
 }
+

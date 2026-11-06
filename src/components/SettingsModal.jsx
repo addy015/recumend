@@ -57,10 +57,12 @@ export default function SettingsModal({ isOpen, onClose }) {
         <form onSubmit={handleSave} className="space-y-4">
           {/* Mutable Display Name */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="settings-display-name" className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Display Name
             </label>
             <input
+              id="settings-display-name"
+              name="displayName"
               type="text"
               required
               value={displayName}
@@ -72,12 +74,14 @@ export default function SettingsModal({ isOpen, onClose }) {
 
           {/* Mutable Username */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="settings-username" className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Unique Handle (@username)
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-stone-400 font-mono">@</span>
               <input
+                id="settings-username"
+                name="username"
                 type="text"
                 required
                 value={username}

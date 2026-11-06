@@ -28,6 +28,30 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
 
   if (!isOpen || !item) return null
 
+  // Prevent editing locked/undecrypted items
+  if (item.is_private && !item._isDecrypted && item.title === '[Encrypted Item]') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
+        <div className="w-full max-w-md bg-white border border-stone-200 rounded-2xl p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+            <h2 className="font-display text-base font-bold text-zinc-950">Item Locked</h2>
+            <button type="button" onClick={onClose} className="p-1.5 text-stone-400 hover:text-zinc-950 rounded-lg">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="text-xs text-stone-600">
+            This private item cannot be edited because it is currently encrypted with an unverified key. Please ensure your vault key is synced before editing.
+          </p>
+          <div className="flex justify-end pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-zinc-950 text-white text-xs font-semibold rounded-xl">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Save changes to the recommendation across the platform
   const handleSave = async (e) => {
     e.preventDefault()
@@ -115,10 +139,12 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
         <form onSubmit={handleSave} className="space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="edit-rec-title" className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Title / Name
             </label>
             <input
+              id="edit-rec-title"
+              name="title"
               type="text"
               required
               value={title}
@@ -153,10 +179,12 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
           {/* Custom Category Input if 'other' is selected */}
           {category === 'other' && (
             <div>
-              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="edit-rec-custom-category" className="block text-xs font-semibold text-zinc-800 mb-1.5">
                 Custom Category Label <span className="text-[#2D6A4F]">*</span>
               </label>
               <input
+                id="edit-rec-custom-category"
+                name="customCategory"
                 type="text"
                 required
                 value={customCategory}
@@ -169,7 +197,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
 
           {/* Extra Details */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="edit-rec-extra" className="block text-xs font-semibold text-zinc-800 mb-1.5">
               {category === 'yt'
                 ? 'Channel Link'
                 : category === 'book'
@@ -179,6 +207,8 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                 : 'Platform / Source (optional)'}
             </label>
             <input
+              id="edit-rec-extra"
+              name="extra"
               type="text"
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
@@ -197,10 +227,12 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
 
           {/* Reason / Note */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="edit-rec-note" className="block text-xs font-semibold text-zinc-800 mb-1.5">
               Description of your recommendation
             </label>
             <textarea
+              id="edit-rec-note"
+              name="note"
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}

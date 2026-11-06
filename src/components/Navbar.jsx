@@ -120,6 +120,10 @@ export default function Navbar({
           >
             <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-stone-400 absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="global-search-input"
+              name="searchQuery"
+              aria-label="Search recommendations or users"
+              autoComplete="off"
               type="text"
               value={searchQuery}
               onFocus={() => setSearchFocused(true)}

@@ -150,12 +150,14 @@ export default function AuthModal({ isOpen, onClose }) {
         <form onSubmit={handleEmailAuth} className="space-y-3">
           {mode === 'signup' && (
             <div>
-              <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+              <label htmlFor="auth-display-name" className="block text-[11px] font-semibold text-zinc-800 mb-1">
                 Display Name
               </label>
               <div className="relative">
                 <User className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
+                  id="auth-display-name"
+                  name="displayName"
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -167,14 +169,17 @@ export default function AuthModal({ isOpen, onClose }) {
           )}
 
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+            <label htmlFor="auth-email" className="block text-[11px] font-semibold text-zinc-800 mb-1">
               Email Address
             </label>
             <div className="relative">
               <Mail className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
+                id="auth-email"
+                name="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
@@ -184,14 +189,17 @@ export default function AuthModal({ isOpen, onClose }) {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-800 mb-1">
+            <label htmlFor="auth-password" className="block text-[11px] font-semibold text-zinc-800 mb-1">
               Password
             </label>
             <div className="relative">
               <Lock className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
+                id="auth-password"
+                name="password"
                 type="password"
                 required
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
