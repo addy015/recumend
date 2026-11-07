@@ -5,13 +5,18 @@ import { useAuth } from '../context/AuthContext'
 import { CATEGORIES } from '../constants/categories'
 
 // Modal dialog for submitting a new recommendation or upvoting existing matches
-export default function AddRecommendationModal({ isOpen, onClose, initialPrivate = false }) {
+export default function AddRecommendationModal({
+  isOpen,
+  onClose,
+  initialPrivate = false,
+  initialCategory = 'movie'
+}) {
   const { items, addItem, toggleRecommend, userRecs, normalizeTitle } = useItems()
   const { user, signInWithGoogle } = useAuth()
 
   // Form input fields
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('movie')
+  const [category, setCategory] = useState(initialCategory || 'movie')
   const [customCategory, setCustomCategory] = useState('')
   const [note, setNote] = useState('')
   const [linkOrExtra, setLinkOrExtra] = useState('')
@@ -20,17 +25,20 @@ export default function AddRecommendationModal({ isOpen, onClose, initialPrivate
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [duplicateCandidate, setDuplicateCandidate] = useState(null)
 
-  // Sync isPrivate when modal opens or initialPrivate changes
+  // Sync isPrivate and initialCategory when modal opens or initial values change
   useEffect(() => {
     if (isOpen) {
       setIsPrivate(Boolean(initialPrivate))
+      if (initialCategory && initialCategory !== 'all') {
+        setCategory(initialCategory)
+      }
     }
-  }, [isOpen, initialPrivate])
+  }, [isOpen, initialPrivate, initialCategory])
 
   // Clear inputs and error messages
   const resetForm = () => {
     setTitle('')
-    setCategory('movie')
+    setCategory(initialCategory && initialCategory !== 'all' ? initialCategory : 'movie')
     setCustomCategory('')
     setNote('')
     setLinkOrExtra('')

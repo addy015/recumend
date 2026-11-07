@@ -73,6 +73,7 @@ function MainContent() {
   // Modal open states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [addModalInitialPrivate, setAddModalInitialPrivate] = useState(false)
+  const [addModalInitialCategory, setAddModalInitialCategory] = useState('movie')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   // Listen to browser navigation (back/forward and custom navigate events)
@@ -109,6 +110,7 @@ function MainContent() {
       return
     }
     setAddModalInitialPrivate(Boolean(options?.isPrivate))
+    setAddModalInitialCategory(options?.category && options.category !== 'all' ? options.category : 'movie')
     setIsAddModalOpen(true)
   }
 
@@ -217,14 +219,18 @@ function MainContent() {
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                   activeTab === 'my-recs'
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 shadow-xs'
+                    ? 'bg-zinc-900 text-white shadow-xs'
                     : 'text-stone-500 hover:text-zinc-900 hover:bg-stone-100'
                 }`}
               >
-                <Bookmark className="w-4 h-4 text-emerald-600" />
+                <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-white' : 'text-stone-500'}`} />
                 <span>My Recommendations</span>
                 {user && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-mono rounded-md bg-stone-200 text-stone-700">
+                  <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded-md ${
+                    activeTab === 'my-recs'
+                      ? 'bg-zinc-800 text-zinc-200'
+                      : 'bg-stone-200 text-stone-700'
+                  }`}>
                     {myItems.length + (upvotedItems?.length || 0)}
                   </span>
                 )}
@@ -233,7 +239,7 @@ function MainContent() {
 
             {/* Tab Views */}
             {activeTab === 'my-recs' ? (
-              <MyRecommendations onOpenAddModal={handleOpenAddModal} />
+              <MyRecommendations onOpenAddModal={handleOpenAddModal} searchQuery={searchQuery} />
             ) : (
               <CommunityFeed
                 searchQuery={searchQuery}
@@ -281,6 +287,7 @@ function MainContent() {
       <AddRecommendationModal
         isOpen={isAddModalOpen}
         initialPrivate={addModalInitialPrivate}
+        initialCategory={addModalInitialCategory}
         onClose={() => setIsAddModalOpen(false)}
       />
 

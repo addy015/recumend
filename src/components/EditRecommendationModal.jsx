@@ -125,7 +125,6 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
         <div className="flex items-center justify-between pb-3 border-b border-stone-100">
           <div>
             <h2 className="font-display text-base font-bold text-zinc-950">Edit Recommendation</h2>
-            <p className="text-xs text-stone-500">Updates will reflect live across the entire community</p>
           </div>
           <button
             type="button"

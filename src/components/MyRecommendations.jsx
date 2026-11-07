@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Bookmark,
   Edit3,
@@ -11,14 +11,37 @@ import {
   Lock,
   Globe,
   Loader2,
+  Search,
 } from "lucide-react";
 import { useItems } from "../context/ItemContext";
 import { CATEGORIES } from "../constants/categories";
 import { getSafeExternalLink } from "../lib/avatar";
+import CategoryFilter from "./CategoryFilter";
 import EditRecommendationModal from "./EditRecommendationModal";
 
+// Category badge color lookup matching community leaderboard styling
+function getCategoryBadgeClass(category) {
+  switch (category) {
+    case 'movie':
+      return 'bg-amber-50 text-amber-900 border-amber-200/80';
+    case 'anime':
+      return 'bg-indigo-50 text-indigo-900 border-indigo-200/80';
+    case 'book':
+      return 'bg-emerald-50 text-emerald-900 border-emerald-200/80';
+    case 'game':
+      return 'bg-rose-50 text-rose-900 border-rose-200/80';
+    case 'yt':
+    case 'webseries':
+      return 'bg-orange-50 text-orange-900 border-orange-200/80';
+    case 'app':
+    case 'other':
+    default:
+      return 'bg-stone-100 text-stone-800 border-stone-200/90';
+  }
+}
+
 // User dashboard for managing personal created recommendations, private vault items, and endorsements
-export default function MyRecommendations({ onOpenAddModal }) {
+export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) {
   const {
     myItems,
     myPrivateItems = [],
@@ -31,12 +54,87 @@ export default function MyRecommendations({ onOpenAddModal }) {
 
   // Active sub-tab ('created' | 'private' | 'upvoted')
   const [activeTab, setActiveTab] = useState("created");
+  const [createdCategory, setCreatedCategory] = useState("all");
+  const [vaultCategory, setVaultCategory] = useState("all");
   const [editingItem, setEditingItem] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
   const [privacyModalItem, setPrivacyModalItem] = useState(null);
   const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Filter created public items by category and search query
+  const filteredCreatedItems = useMemo(() => {
+    let result = [...myItems];
+
+    if (createdCategory !== "all") {
+      result = result.filter((item) => item.category === createdCategory);
+    }
+
+    if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((item) => {
+        const matchTitle = (item.title || "").toLowerCase().includes(q);
+        const matchCategory = (item.category || "").toLowerCase().includes(q);
+        const matchCustomCat = (item.metadata?.custom_category || "").toLowerCase().includes(q);
+        const matchNote = (item.metadata?.note || "").toLowerCase().includes(q);
+        const matchAuthor = (item.metadata?.author || "").toLowerCase().includes(q);
+        const matchPlatform = (item.metadata?.platform || "").toLowerCase().includes(q);
+        return matchTitle || matchCategory || matchCustomCat || matchNote || matchAuthor || matchPlatform;
+      });
+    }
+
+    return result;
+  }, [myItems, createdCategory, searchQuery]);
+
+  // Filter upvoted items by search query
+  const filteredUpvotedItems = useMemo(() => {
+    if (!searchQuery?.trim()) return upvotedItems;
+    const q = searchQuery.trim().toLowerCase();
+    return upvotedItems.filter((item) => {
+      const matchTitle = (item.title || "").toLowerCase().includes(q);
+      const matchCategory = (item.category || "").toLowerCase().includes(q);
+      const matchCustomCat = (item.metadata?.custom_category || "").toLowerCase().includes(q);
+      const matchNote = (item.metadata?.note || "").toLowerCase().includes(q);
+      const matchAuthor = (item.metadata?.author || "").toLowerCase().includes(q);
+      const matchPlatform = (item.metadata?.platform || "").toLowerCase().includes(q);
+      const matchCreator = (item.creator?.username || "").toLowerCase().includes(q) ||
+        (item.creator?.display_name || "").toLowerCase().includes(q);
+      return matchTitle || matchCategory || matchCustomCat || matchNote || matchAuthor || matchPlatform || matchCreator;
+    });
+  }, [upvotedItems, searchQuery]);
+
+  // Filter private vault items by category and search query
+  const filteredPrivateItems = useMemo(() => {
+    let result = [...myPrivateItems];
+
+    if (vaultCategory !== "all") {
+      result = result.filter((item) => item.category === vaultCategory);
+    }
+
+    if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((item) => {
+        const title = (item.title || "").toLowerCase();
+        const category = (item.category || "").toLowerCase();
+        const customCat = (item.metadata?.custom_category || "").toLowerCase();
+        const note = (item.metadata?.note || "").toLowerCase();
+        const author = (item.metadata?.author || "").toLowerCase();
+        const platform = (item.metadata?.platform || "").toLowerCase();
+
+        return (
+          title.includes(q) ||
+          category.includes(q) ||
+          customCat.includes(q) ||
+          note.includes(q) ||
+          author.includes(q) ||
+          platform.includes(q)
+        );
+      });
+    }
+
+    return result;
+  }, [myPrivateItems, vaultCategory, searchQuery]);
 
   // Permanently delete a recommendation created by this user
   const handleDelete = async (itemId) => {
@@ -70,12 +168,8 @@ export default function MyRecommendations({ onOpenAddModal }) {
         <div>
           <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-zinc-950 flex items-center gap-2">
             <Bookmark className="w-5 h-5 text-emerald-600" />
-            My Recommendations
+            My Recom  mendations
           </h2>
-          <p className="text-xs text-stone-500 mt-0.5">
-            Manage your public recommendations, private encrypted vault items,
-            and endorsements.
-          </p>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto">
@@ -130,7 +224,9 @@ export default function MyRecommendations({ onOpenAddModal }) {
         >
           <span>Created (Public)</span>
           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-700">
-            {myItems.length}
+            {createdCategory !== "all" || searchQuery?.trim()
+              ? `${filteredCreatedItems.length}/${myItems.length}`
+              : myItems.length}
           </span>
         </button>
 
@@ -145,7 +241,7 @@ export default function MyRecommendations({ onOpenAddModal }) {
         >
           <span>Upvoted</span>
           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-700">
-            {upvotedItems.length}
+            {searchQuery?.trim() ? `${filteredUpvotedItems.length}/${upvotedItems.length}` : upvotedItems.length}
           </span>
         </button>
 
@@ -161,49 +257,84 @@ export default function MyRecommendations({ onOpenAddModal }) {
           <Lock className="w-3.5 h-3.5 text-emerald-700" />
           <span>Private Vault</span>
           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60">
-            {myPrivateItems.length}
+            {vaultCategory !== "all" || searchQuery?.trim()
+              ? `${filteredPrivateItems.length}/${myPrivateItems.length}`
+              : myPrivateItems.length}
           </span>
         </button>
       </div>
 
       {/* TAB 1: CREATED (PUBLIC) ITEMS */}
-      {activeTab === "created" &&
-        (myItems.length === 0 ? (
-          <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-            <Bookmark className="w-8 h-8 text-stone-400 mx-auto" />
-            <p className="font-display text-sm font-bold text-zinc-950">
-              You haven't added any public recommendations yet
-            </p>
-            <p className="text-xs text-stone-500 max-w-sm mx-auto">
-              Recommend your favorite movies, anime, books, or YouTube channels
-              to put them on the global leaderboard.
-            </p>
-            <button
-              type="button"
-              onClick={() => onOpenAddModal?.({ isPrivate: false })}
-              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Your First Recommendation</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {myItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white border border-stone-200/90 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-stone-300 transition-colors shadow-xs"
+      {activeTab === "created" && (
+        <div className="space-y-4">
+          {/* Category Filter Chips matching Community Leaderboard */}
+          <CategoryFilter
+            selectedCategory={createdCategory}
+            onSelectCategory={setCreatedCategory}
+          />
+
+          {myItems.length === 0 ? (
+            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
+              <Bookmark className="w-8 h-8 text-stone-400 mx-auto" />
+              <p className="font-display text-sm font-bold text-zinc-950">
+                You haven't added any public recommendations yet
+              </p>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                Recommend your favorite movies, anime, books, or YouTube channels
+                to put them on the global leaderboard.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenAddModal?.({
+                    isPrivate: false,
+                    category: createdCategory !== "all" ? createdCategory : "movie",
+                  })
+                }
+                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
               >
-                {/* Item Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 bg-stone-100 border border-stone-200 text-stone-800 rounded-full font-semibold">
-                      {item.category === "other" &&
-                      item.metadata?.custom_category
-                        ? item.metadata.custom_category
-                        : CATEGORIES.find((c) => c.id === item.category)
-                            ?.label || item.category}
-                    </span>
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Your First Recommendation</span>
+              </button>
+            </div>
+          ) : filteredCreatedItems.length === 0 ? (
+            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
+              <Search className="w-8 h-8 text-stone-400 mx-auto" />
+              <p className="font-display text-sm font-bold text-zinc-950">
+                No recommendations found
+              </p>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                {searchQuery?.trim()
+                  ? `No public recommendations matching "${searchQuery}".`
+                  : `You haven't added any public recommendations in "${CATEGORIES.find((c) => c.id === createdCategory)?.label || createdCategory}" yet.`}
+              </p>
+              {createdCategory !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setCreatedCategory("all")}
+                  className="mt-2 px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  View All ({myItems.length})
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredCreatedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white hover:bg-white border border-stone-200/90 hover:border-stone-300 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                >
+                  {/* Item Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
+                        {item.category === "other" &&
+                        item.metadata?.custom_category
+                          ? item.metadata.custom_category
+                          : CATEGORIES.find((c) => c.id === item.category)
+                              ?.label || item.category}
+                      </span>
                     {item.metadata?.year && (
                       <span className="text-xs font-mono text-stone-500">
                         {item.metadata.year}
@@ -287,21 +418,18 @@ export default function MyRecommendations({ onOpenAddModal }) {
               </div>
             ))}
           </div>
-        ))}
+        )}
+      </div>
+    )}
 
       {/* TAB 2: PRIVATE E2EE VAULT ITEMS */}
       {activeTab === "private" && (
         <div className="space-y-4">
-          {/* Vault Info Card */}
-          <div className="p-3.5 sm:p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl flex items-start gap-2.5 text-xs text-emerald-950">
-            <Lock className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-emerald-900">Zero-Knowledge Private Vault</p>
-              <p className="text-[11px] text-emerald-800/80 mt-0.5">
-                Items are encrypted client-side using AES-256 before reaching the database. Database admins and other visitors cannot see titles or notes.
-              </p>
-            </div>
-          </div>
+          {/* Category Filter Chips */}
+          <CategoryFilter
+            selectedCategory={vaultCategory}
+            onSelectCategory={setVaultCategory}
+          />
 
           {myPrivateItems.length === 0 ? (
             <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
@@ -314,24 +442,70 @@ export default function MyRecommendations({ onOpenAddModal }) {
               </p>
               <button
                 type="button"
-                onClick={() => onOpenAddModal?.({ isPrivate: true })}
+                onClick={() =>
+                  onOpenAddModal?.({
+                    isPrivate: true,
+                    category: vaultCategory !== "all" ? vaultCategory : "movie",
+                  })
+                }
                 className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Private Recommendation</span>
               </button>
             </div>
+          ) : filteredPrivateItems.length === 0 ? (
+            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
+              <Search className="w-8 h-8 text-stone-400 mx-auto" />
+              <p className="font-display text-sm font-bold text-zinc-950">
+                No private recommendations found
+              </p>
+              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                {searchQuery?.trim()
+                  ? `No private items matching "${searchQuery}" in this category.`
+                  : `You haven't added any private recommendations in "${CATEGORIES.find((c) => c.id === vaultCategory)?.label || vaultCategory}" yet.`}
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
+                {vaultCategory !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setVaultCategory("all")}
+                    className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                  >
+                    View All ({myPrivateItems.length})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenAddModal?.({
+                      isPrivate: true,
+                      category: vaultCategory !== "all" ? vaultCategory : "movie",
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>
+                    Add in{" "}
+                    {vaultCategory !== "all"
+                      ? CATEGORIES.find((c) => c.id === vaultCategory)?.label || "Category"
+                      : "Private Vault"}
+                  </span>
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-3">
-              {myPrivateItems.map((item) => (
+              {filteredPrivateItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white border border-emerald-900/10 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-emerald-700/30 transition-colors shadow-xs"
+                  className="bg-white border border-emerald-900/10 hover:border-emerald-700/30 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
                 >
                   {/* Item Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 bg-stone-100 border border-stone-200 text-stone-800 rounded-full font-semibold">
+                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
                         {item.category === "other" &&
                         item.metadata?.custom_category
                           ? item.metadata.custom_category
@@ -360,9 +534,10 @@ export default function MyRecommendations({ onOpenAddModal }) {
                     </div>
 
                     <h3 className="font-display font-bold text-sm sm:text-base text-zinc-950 break-words line-clamp-2">
-                      {item._isDecrypted || (item.title && item.title !== '[Encrypted Item]') ? (
+                      {item._isDecrypted ||
+                      (item.title && item.title !== "[Encrypted Item]") ? (
                         item.title
-                      ) : (item._decryptionFailed || vaultError) ? (
+                      ) : item._decryptionFailed || vaultError ? (
                         <span className="inline-flex items-center gap-1.5 text-stone-500 font-mono text-xs bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
                           <Lock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
                           <span>Encrypted</span>
@@ -406,7 +581,11 @@ export default function MyRecommendations({ onOpenAddModal }) {
                             ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed"
                             : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200 cursor-pointer"
                         }`}
-                        title={!item._isDecrypted ? "Cannot make public until decrypted" : "Publish this item to the community leaderboard"}
+                        title={
+                          !item._isDecrypted
+                            ? "Cannot make public until decrypted"
+                            : "Publish this item to the community leaderboard"
+                        }
                       >
                         <Globe className="w-3.5 h-3.5" />
                         <span>Make Public</span>
@@ -421,7 +600,11 @@ export default function MyRecommendations({ onOpenAddModal }) {
                             ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed"
                             : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200 cursor-pointer"
                         }`}
-                        title={!item._isDecrypted ? "Cannot edit until decrypted" : "Edit recommendation details"}
+                        title={
+                          !item._isDecrypted
+                            ? "Cannot edit until decrypted"
+                            : "Edit recommendation details"
+                        }
                       >
                         <Edit3 className="w-3.5 h-3.5 text-stone-400" />
                         <span>Edit</span>
@@ -446,8 +629,9 @@ export default function MyRecommendations({ onOpenAddModal }) {
       )}
 
       {/* TAB 3: UPVOTED ITEMS */}
-      {activeTab === "upvoted" &&
-        (upvotedItems.length === 0 ? (
+      {activeTab === "upvoted" && (
+        <div className="space-y-4">
+          {upvotedItems.length === 0 ? (
           <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
             <Heart className="w-8 h-8 text-stone-400 mx-auto" />
             <p className="font-display text-sm font-bold text-zinc-950">
@@ -458,17 +642,27 @@ export default function MyRecommendations({ onOpenAddModal }) {
               build this list.
             </p>
           </div>
+        ) : filteredUpvotedItems.length === 0 ? (
+          <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
+            <Search className="w-8 h-8 text-stone-400 mx-auto" />
+            <p className="font-display text-sm font-bold text-zinc-950">
+              No upvoted recommendations found
+            </p>
+            <p className="text-xs text-stone-500 max-w-sm mx-auto">
+              No upvoted items matching "{searchQuery}".
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
-            {upvotedItems.map((item) => (
+            {filteredUpvotedItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white border border-stone-200/90 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:border-stone-300 transition-colors shadow-xs"
+                className="bg-white hover:bg-white border border-stone-200/90 hover:border-stone-300 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
               >
                 {/* Item Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 bg-stone-100 border border-stone-200 text-stone-800 rounded-full font-semibold">
+                    <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
                       {item.category === "other" &&
                       item.metadata?.custom_category
                         ? item.metadata.custom_category
@@ -536,7 +730,9 @@ export default function MyRecommendations({ onOpenAddModal }) {
               </div>
             ))}
           </div>
-        ))}
+        )}
+      </div>
+    )}
 
       {/* Privacy Toggle Confirmation Modal */}
       {privacyModalItem && (
@@ -570,9 +766,7 @@ export default function MyRecommendations({ onOpenAddModal }) {
                   username as the creator.
                 </>
               ) : (
-                <>
-                  This recommendation will be removed from the public feed.
-                </>
+                <>This recommendation will be removed from the public feed.</>
               )}
             </p>
 
