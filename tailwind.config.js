@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  // Scan HTML and React components for Tailwind classes
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -8,15 +7,21 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Plus Jakarta Sans"', 'sans-serif'],
-        body: ['"Inter"', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        body: ['"Inter"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       colors: {
-        canvas: "#F7F6F2",
-        surface: "#FFFFFE",
-        accent: {
-          DEFAULT: "#2D6A4F",
-          hover: "#22543D",
+        canvas: {
+          DEFAULT: "#0A0A0A",
+          subtle: "#121212",
+          muted: "#181818",
+        },
+        surface: {
+          DEFAULT: "#141414",
+          hover: "#1A1A1A",
+          elevated: "#202020",
+          border: "rgba(255, 255, 255, 0.08)",
         },
       },
     },

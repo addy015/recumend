@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ItemProvider, useItems } from './context/ItemContext'
 import Navbar from './components/Navbar'
@@ -9,7 +9,7 @@ import AddRecommendationModal from './components/AddRecommendationModal'
 import SettingsModal from './components/SettingsModal'
 import UserProfileView from './components/UserProfileView'
 import LegalView from './components/LegalView'
-import { TrendingUp, Bookmark } from 'lucide-react'
+import { TrendingUp, Bookmark, X } from 'lucide-react'
 
 // Lightweight SPA routing helper
 function navigate(url) {
@@ -69,6 +69,38 @@ function MainContent() {
     return 'feed'
   })
   const [searchQuery, setSearchQuery] = useState('')
+  const [feedSortBy, setFeedSortBy] = useState('overall') // 'overall' | 'recent'
+  const [toast, setToast] = useState(null)
+  const toastTimerRef = useRef(null)
+
+  // Trigger floating toast notification with optional action button
+  const showToast = useCallback(({ message, actionLabel, onAction }) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    setToast({ id: Date.now(), message, actionLabel, onAction })
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null)
+    }, 5000)
+  }, [])
+
+  // Handle successful recommendation addition
+  const handleAddSuccess = useCallback(({ isPrivate }) => {
+    if (isPrivate) {
+      showToast({
+        message: 'Saved to your private vault.'
+      })
+    } else {
+      showToast({
+        message: 'Recommendation published!',
+        actionLabel: 'View in Most Recent →',
+        onAction: () => {
+          navigate('/feed')
+          setActiveTab('feed')
+          setFeedSortBy('recent')
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+      })
+    }
+  }, [showToast])
 
   // Modal open states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -145,7 +177,7 @@ function MainContent() {
 
   // ROUTE 2 & 3: /feed or /u/:username -> Community Dashboard
   return (
-    <div className="min-h-screen bg-[#F7F6F2] text-[#1C1917] flex flex-col font-body selection:bg-stone-200 selection:text-stone-900">
+    <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200">
       {/* Main Navbar */}
       <Navbar
         searchQuery={searchQuery}
@@ -174,7 +206,7 @@ function MainContent() {
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {route.page === 'privacy' ? (
           <LegalView onBack={() => navigate('/')} />
         ) : route.page === 'profile' && route.username ? (
@@ -190,21 +222,21 @@ function MainContent() {
         ) : (
           <>
             {/* Tab Switcher */}
-            <div className="flex items-center gap-2 border-b border-stone-200 pb-3">
+            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-4">
               <button
                 type="button"
                 onClick={() => {
                   navigate('/feed')
                   setActiveTab('feed')
                 }}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[38px] ${
                   activeTab === 'feed'
-                    ? 'bg-zinc-900 text-white shadow-xs'
-                    : 'text-stone-500 hover:text-zinc-900 hover:bg-stone-100'
+                    ? 'bg-white text-black'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
                 }`}
               >
                 <TrendingUp className="w-4 h-4" />
-                <span>Community Leaderboard</span>
+                <span>Leaderboard</span>
               </button>
 
               <button
@@ -217,19 +249,19 @@ function MainContent() {
                   navigate('/feed#/my-recs')
                   setActiveTab('my-recs')
                 }}
-                className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[38px] ${
                   activeTab === 'my-recs'
-                    ? 'bg-zinc-900 text-white shadow-xs'
-                    : 'text-stone-500 hover:text-zinc-900 hover:bg-stone-100'
+                    ? 'bg-white text-black'
+                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
                 }`}
               >
-                <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-white' : 'text-stone-500'}`} />
-                <span>My Recommendations</span>
+                <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-black' : 'text-zinc-400'}`} />
+                <span>My Vault</span>
                 {user && (
-                  <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded-md ${
+                  <span className={`px-2 py-0.5 text-[10px] font-mono rounded-full ${
                     activeTab === 'my-recs'
-                      ? 'bg-zinc-800 text-zinc-200'
-                      : 'bg-stone-200 text-stone-700'
+                      ? 'bg-black/10 text-black font-bold'
+                      : 'bg-white/[0.08] text-zinc-300'
                   }`}>
                     {myItems.length + (upvotedItems?.length || 0)}
                   </span>
@@ -243,6 +275,8 @@ function MainContent() {
             ) : (
               <CommunityFeed
                 searchQuery={searchQuery}
+                sortBy={feedSortBy}
+                onSortChange={setFeedSortBy}
                 onOpenAddModal={handleOpenAddModal}
                 onSelectUser={(creator) => {
                   if (creator?.username) {
@@ -255,30 +289,29 @@ function MainContent() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-stone-200 mt-auto py-8 px-4 font-mono bg-[#F7F6F2]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500">
-          <div className="flex items-center gap-2">
+      {/* Minimal Footer */}
+      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#0A0A0A] border-t border-white/[0.08] mt-auto">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="font-display font-bold text-zinc-900 hover:text-[#2D6A4F] transition-colors cursor-pointer"
+              className="font-display font-bold text-white tracking-tight flex items-center hover:opacity-90 transition-opacity cursor-pointer"
             >
-              recumend
+              <span>recumend</span>
+              <span className="bg-zinc-400 w-1 h-1 rounded-full mx-2"></span>
+              <span className="font-thin">taste matters</span>
             </button>
-            <span className="text-stone-300">•</span>
-            <span>only human taste</span>
-            <span className="text-stone-300">•</span>
+          </div>
+
+          <div className="text-[11px] text-zinc-600 text-center sm:text-right">
             <button
               type="button"
               onClick={() => navigate('/privacy')}
-              className="hover:text-zinc-900 underline transition-colors cursor-pointer"
+              className="text-zinc-500 hover:text-white underline transition-colors cursor-pointer"
             >
               privacy policy
             </button>
-          </div>
-          <div className="text-[11px] text-stone-500">
-            Life's too short for mid consumption.
           </div>
         </div>
       </footer>
@@ -288,6 +321,7 @@ function MainContent() {
         isOpen={isAddModalOpen}
         initialPrivate={addModalInitialPrivate}
         initialCategory={addModalInitialCategory}
+        onSuccess={handleAddSuccess}
         onClose={() => setIsAddModalOpen(false)}
       />
 
@@ -296,6 +330,37 @@ function MainContent() {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
       />
+
+      {/* Floating Toast Notification Banner */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-[#141414] text-white border border-white/[0.12] rounded-full shadow-2xl font-mono text-xs max-w-[90vw] animate-in fade-in slide-in-from-bottom-2 duration-200"
+        >
+          <span className="text-zinc-300 select-none">{toast.message}</span>
+          {toast.actionLabel && toast.onAction && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.onAction()
+                setToast(null)
+              }}
+              className="px-3 py-1 bg-white text-black hover:bg-zinc-200 rounded-full text-xs font-semibold font-body transition-colors cursor-pointer whitespace-nowrap"
+            >
+              {toast.actionLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            aria-label="Close notification"
+            className="p-1 text-zinc-500 hover:text-white rounded-full transition-colors cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -202,12 +202,15 @@ export function ItemProvider({ children }) {
 
   // Load items on mount (either from localStorage or Supabase database)
   useEffect(() => {
+    let isCancelled = false
+
     async function loadData() {
       if (!isSupabaseConfigured) {
         // Fallback to localStorage in offline demo mode
         const savedItems = localStorage.getItem(LOCAL_ITEMS_KEY)
         let initial = savedItems ? JSON.parse(savedItems) : INITIAL_ITEMS
 
+        if (isCancelled) return
         setItems(initial)
 
         if (user?.id) {
@@ -223,9 +226,11 @@ export function ItemProvider({ children }) {
               recsSet.add(it.id)
             }
           })
+          if (isCancelled) return
           setUserRecs(recsSet)
           localStorage.setItem(LOCAL_RECS_KEY, JSON.stringify([...recsSet]))
         } else {
+          if (isCancelled) return
           setUserRecs(new Set())
         }
         setLoading(false)
@@ -246,6 +251,8 @@ export function ItemProvider({ children }) {
           .order('recommend_count', { ascending: false })
           .order('created_at', { ascending: true })
 
+        if (isCancelled) return
+
         if (pubRes.error) {
           // Fallback: If 004_private_vault.sql migration has not been run yet in Supabase SQL editor,
           // PostgREST will fail with 'column items.is_private does not exist'. Fallback to plain query.
@@ -256,6 +263,7 @@ export function ItemProvider({ children }) {
             .gte('recommend_count', 1)
             .order('recommend_count', { ascending: false })
             .order('created_at', { ascending: true })
+          if (isCancelled) return
           publicItems = fallbackRes.data || []
         } else {
           publicItems = pubRes.data || []
@@ -263,30 +271,51 @@ export function ItemProvider({ children }) {
 
         if (user?.id) {
           try {
+            // Confirm session token is active to avoid RLS dropping private items
+            const { data: sessData } = await supabase.auth.getSession()
+            const activeUid = sessData?.session?.user?.id || user.id
+
             const privRes = await supabase
               .from('items')
               .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
               .eq('is_private', true)
-              .eq('created_by', user.id)
+              .eq('created_by', activeUid)
               .order('created_at', { ascending: false })
+
+            if (isCancelled) return
+
             if (!privRes.error && privRes.data) {
               privateItems = privRes.data
+            } else if (privRes.error) {
+              console.warn('Private items fetch note:', privRes.error.message)
             }
-          } catch {
-            // Migration 004 might not exist yet, ignore private query failure
+          } catch (pErr) {
+            console.warn('Private items query exception:', pErr)
             privateItems = []
           }
         }
 
-        const combined = [...publicItems, ...privateItems]
+        if (isCancelled) return
 
-        setItems(combined)
+        // Preserve already decrypted in-memory items when refreshing items list
+        setItems(prev => {
+          const decryptedCache = new Map()
+          prev.forEach(it => {
+            if (it.is_private && it._isDecrypted) {
+              decryptedCache.set(it.id, it)
+            }
+          })
+          const incoming = [...publicItems, ...privateItems]
+          return incoming.map(it => decryptedCache.get(it.id) || it)
+        })
 
         if (user?.id) {
           const { data: recs } = await supabase
             .from('recommendations')
             .select('item_id')
             .eq('user_id', user.id)
+
+          if (isCancelled) return
 
           const recSet = new Set(recs ? recs.map(r => r.item_id) : [])
           if (publicItems) {
@@ -298,17 +327,57 @@ export function ItemProvider({ children }) {
           }
           setUserRecs(recSet)
         } else {
+          if (isCancelled) return
           setUserRecs(new Set())
         }
       } catch (err) {
         console.error('Failed to load items from Supabase:', err)
       } finally {
-        setLoading(false)
+        if (!isCancelled) {
+          setLoading(false)
+        }
       }
     }
 
     loadData()
+
+    return () => {
+      isCancelled = true
+    }
   }, [user?.id, profile?.id])
+
+  // Manually or dynamically re-sync private vault items (e.g. on opening Vault tab)
+  const refreshPrivateItems = useCallback(async () => {
+    if (!isSupabaseConfigured || !user?.id) return
+    try {
+      const { data: sessData } = await supabase.auth.getSession()
+      const activeUid = sessData?.session?.user?.id || user.id
+
+      const privRes = await supabase
+        .from('items')
+        .select('*, creator:profiles!created_by(id, username, display_name, avatar_url, app_uid)')
+        .eq('is_private', true)
+        .eq('created_by', activeUid)
+        .order('created_at', { ascending: false })
+
+      if (!privRes.error && privRes.data) {
+        setItems(prev => {
+          const decryptedCache = new Map()
+          prev.forEach(it => {
+            if (it.is_private && it._isDecrypted) {
+              decryptedCache.set(it.id, it)
+            }
+          })
+
+          const publicOnly = prev.filter(it => !it.is_private)
+          const freshPrivate = privRes.data.map(it => decryptedCache.get(it.id) || it)
+          return [...publicOnly, ...freshPrivate]
+        })
+      }
+    } catch (err) {
+      console.warn('Failed to refresh private items:', err)
+    }
+  }, [user?.id])
 
   // Realtime subscription for live item changes across tabs or Supabase channels
   useEffect(() => {
@@ -478,7 +547,7 @@ export function ItemProvider({ children }) {
       // Creator's recommendation is locked at 1
       if (isOwner && isCurrentlyRecommended) {
         return {
-          error: 'You recommended this item when creating it (locked at 1). Manage or delete it in My Recommendations.',
+          error: 'You already recommended this item.',
           isOwner: true
         }
       }
@@ -1109,9 +1178,16 @@ export function ItemProvider({ children }) {
     [enrichedItems]
   )
 
-  // Public items created by currently logged-in user
+  // Public items created by currently logged-in user (Strictly sorted created_at DESC for top-first placement)
   const myItems = useMemo(
-    () => enrichedItems.filter(it => Boolean(user?.id && it.created_by === user.id && !it.is_private)),
+    () => enrichedItems
+      .filter(it => Boolean(user?.id && it.created_by === user.id && !it.is_private))
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        if (dateB !== dateA) return dateB - dateA
+        return String(a.id || '').localeCompare(String(b.id || ''))
+      }),
     [enrichedItems, user]
   )
 
@@ -1122,13 +1198,21 @@ export function ItemProvider({ children }) {
       .sort((a, b) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
-        return dateB - dateA
+        if (dateB !== dateA) return dateB - dateA
+        return String(a.id || '').localeCompare(String(b.id || ''))
       })
   }, [enrichedItems, user])
 
-  // Items upvoted by user (excluding items they created)
+  // Items upvoted by user (excluding items they created), sorted created_at DESC for top-first placement
   const upvotedItems = useMemo(
-    () => enrichedItems.filter(it => Boolean(user?.id && userRecs.has(it.id) && it.created_by !== user.id && !it.is_private)),
+    () => enrichedItems
+      .filter(it => Boolean(user?.id && userRecs.has(it.id) && it.created_by !== user.id && !it.is_private))
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        if (dateB !== dateA) return dateB - dateA
+        return String(a.id || '').localeCompare(String(b.id || ''))
+      }),
     [enrichedItems, user, userRecs]
   )
 
@@ -1144,6 +1228,7 @@ export function ItemProvider({ children }) {
       vaultKeys,
       isVaultSyncing,
       vaultError,
+      refreshPrivateItems,
       toggleRecommend,
       addItem,
       updateItem,

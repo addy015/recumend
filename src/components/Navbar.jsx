@@ -39,6 +39,7 @@ export default function Navbar({
   const [matchingUsers, setMatchingUsers] = useState([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchContainerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Search user profiles in real time when typing an @handle or name
   useEffect(() => {
@@ -71,6 +72,25 @@ export default function Navbar({
     };
   }, [searchQuery, isSupabaseConfigured]);
 
+  // Close user dropdown menu when clicking anywhere outside or pressing Escape
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    function handleDropdownOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setDropdownOpen(false);
+    }
+    document.addEventListener("mousedown", handleDropdownOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleDropdownOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [dropdownOpen]);
+
   // Close search suggestions dropdown when clicking outside the input
   useEffect(() => {
     function handleClickOutside(e) {
@@ -94,11 +114,11 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#F7F6F2]/90 backdrop-blur-md border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+      <header className="sticky top-0 z-30 bg-[#0A0A0A]/90 backdrop-blur-md border-b border-white/[0.08]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
           {/* Brand */}
           <div
-            className="flex items-center gap-2 cursor-pointer shrink-0"
+            className="flex items-center gap-2 cursor-pointer shrink-0 select-none group"
             onClick={() => {
               setSearchQuery("");
               if (onGoToHome) {
@@ -108,8 +128,9 @@ export default function Navbar({
               }
             }}
           >
-            <span className="font-display font-black text-base sm:text-lg tracking-tight text-zinc-950 select-none">
-              recumend
+            <span className="font-display font-bold text-lg tracking-tight text-white transition-opacity group-hover:opacity-80 flex items-center">
+              <span>recumend&nbsp;</span>
+              <span className="w-1.5 h-1.5 mx-0.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)] inline-block animate-pulse" />
             </span>
           </div>
 
@@ -118,7 +139,7 @@ export default function Navbar({
             className="flex-1 max-w-xs sm:max-w-md relative min-w-0"
             ref={searchContainerRef}
           >
-            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-stone-400 absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               id="global-search-input"
               name="searchQuery"
@@ -133,7 +154,7 @@ export default function Navbar({
                 if (!val.trim()) setMatchingUsers([]);
               }}
               placeholder="Search recs or @username..."
-              className="w-full bg-white border border-stone-200 pl-8 sm:pl-9 pr-7 sm:pr-8 py-1.5 sm:py-2 text-xs text-zinc-900 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 shadow-xs transition-colors"
+              className="w-full bg-[#141414] border border-white/[0.1] pl-9 pr-8 py-2 text-xs text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/20 transition-all font-mono"
             />
             {searchQuery && (
               <button
@@ -142,7 +163,7 @@ export default function Navbar({
                   setSearchQuery("");
                   setMatchingUsers([]);
                 }}
-                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-stone-400 hover:text-stone-700 font-mono"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 hover:text-white font-mono"
               >
                 esc
               </button>
@@ -150,12 +171,11 @@ export default function Navbar({
 
             {/* User Search Dropdown */}
             {searchFocused && searchQuery.trim() && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 shadow-xl rounded-2xl z-50 overflow-hidden divide-y divide-stone-100">
-                {/* If matching profiles found */}
+              <div className="absolute top-full left-0 right-0 mt-2 bg-[#141414] border border-white/[0.12] shadow-2xl rounded-2xl z-50 overflow-hidden divide-y divide-white/[0.06]">
                 {matchingUsers.length > 0 && (
-                  <div className="p-1.5 sm:p-2 space-y-1">
-                    <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-stone-400">
-                      Profiles ({matchingUsers.length})
+                  <div className="p-2 space-y-1">
+                    <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+                      Curators ({matchingUsers.length})
                     </div>
                     {matchingUsers.map((u) => (
                       <button
@@ -166,43 +186,42 @@ export default function Navbar({
                           setSearchQuery("");
                           onSelectUser?.(u);
                         }}
-                        className="w-full flex items-center justify-between p-2 hover:bg-stone-50 rounded-xl transition-colors text-left group"
+                        className="w-full flex items-center justify-between p-2 hover:bg-white/[0.06] rounded-xl transition-colors text-left group min-h-[44px]"
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <img
                             src={getAvatarUrl(u.avatar_url, u.display_name || u.username)}
                             alt={u.display_name}
-                            className="w-6 h-6 object-cover border border-stone-200 rounded-full shrink-0"
+                            className="w-6 h-6 object-cover rounded-full shrink-0"
                             onError={(e) => {
                               e.currentTarget.src = getAvatarUrl(null, u.display_name || u.username);
                             }}
                           />
                           <div className="min-w-0 truncate">
-                            <span className="text-xs font-medium text-zinc-800 group-hover:text-zinc-950 truncate block">
+                            <span className="text-xs font-medium text-zinc-200 group-hover:text-white truncate block">
                               {u.display_name}
                             </span>
-                            <span className="text-[10px] font-mono text-emerald-700">
+                            <span className="text-[10px] font-mono text-zinc-500">
                               @{u.username}
                             </span>
                           </div>
                         </div>
-                        <span className="text-[10px] font-mono text-stone-400 group-hover:text-stone-700 flex items-center gap-1 shrink-0">
-                          View profile <ArrowRight className="w-3 h-3" />
+                        <span className="text-[10px] font-mono text-zinc-500 group-hover:text-zinc-300 flex items-center gap-1 shrink-0">
+                          Profile <ArrowRight className="w-3 h-3" />
                         </span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                {/* Feed Items Filter Option */}
                 <div
-                  className="p-2.5 px-3 hover:bg-stone-50 cursor-pointer flex items-center justify-between text-xs text-stone-600 hover:text-zinc-900"
+                  className="p-3 hover:bg-white/[0.04] cursor-pointer flex items-center justify-between text-xs text-zinc-400 hover:text-white"
                   onClick={() => setSearchFocused(false)}
                 >
                   <span className="truncate">
-                    Filter for "<strong>{searchQuery}</strong>"
+                    Search feed for "<strong>{searchQuery}</strong>"
                   </span>
-                  <span className="text-[10px] font-mono text-stone-400 shrink-0 ml-2">
+                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-2">
                     Enter
                   </span>
                 </div>
@@ -211,40 +230,35 @@ export default function Navbar({
           </div>
 
           {/* Action Buttons & Auth */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {user && profile ? (
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
-                  className="flex items-center gap-2 p-1 hover:bg-stone-100 border border-stone-200 rounded-xl transition-colors"
+                  className="flex items-center gap-2.5 p-1.5 hover:bg-white/[0.06] border border-white/[0.1] rounded-full transition-all cursor-pointer min-h-[44px]"
                   title={`Logged in as @${profile.username}`}
                 >
                   <img
                     src={getAvatarUrl(profile.avatar_url, profile.display_name || profile.username)}
                     alt={profile.display_name}
-                    className="w-7 h-7 object-cover border border-stone-200 rounded-full"
+                    className="w-7 h-7 object-cover rounded-full"
                     onError={(e) => {
                       e.currentTarget.src = getAvatarUrl(null, profile.display_name || profile.username);
                     }}
                   />
-                  <span className="text-xs font-medium text-zinc-700 hidden md:inline pr-1 font-mono">
+                  <span className="text-xs font-mono text-zinc-300 hidden md:inline pr-2">
                     @{profile.username}
                   </span>
                 </button>
 
                 {dropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setDropdownOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-52 bg-white border border-stone-200 p-1.5 shadow-xl rounded-2xl z-50 text-xs space-y-0.5">
-                      <div className="px-3 py-2 border-b border-stone-100">
-                        <p className="font-semibold text-zinc-900 truncate">
+                  <div className="absolute right-0 mt-2 w-56 bg-[#141414] border border-white/[0.12] p-2 shadow-2xl rounded-2xl z-50 text-xs space-y-1">
+                      <div className="px-3 py-2.5 border-b border-white/[0.08]">
+                        <p className="font-semibold text-white truncate">
                           {profile.display_name}
                         </p>
-                        <p className="text-[11px] font-mono text-stone-500 truncate">
+                        <p className="text-[11px] font-mono text-zinc-500 truncate">
                           @{profile.username}
                         </p>
                       </div>
@@ -255,10 +269,10 @@ export default function Navbar({
                           setDropdownOpen(false);
                           if (setActiveTab) setActiveTab("my-recs");
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors min-h-[40px]"
                       >
-                        <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
-                        My Recommendations
+                        <Bookmark className="w-4 h-4 text-zinc-400" />
+                        <span>My Vault</span>
                       </button>
 
                       <button
@@ -267,10 +281,10 @@ export default function Navbar({
                           setDropdownOpen(false);
                           onOpenProfileModal();
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors min-h-[40px]"
                       >
-                        <User className="w-3.5 h-3.5 text-stone-500" />
-                        Public Profile
+                        <User className="w-4 h-4 text-zinc-400" />
+                        <span>Public Profile</span>
                       </button>
 
                       <button
@@ -279,25 +293,26 @@ export default function Navbar({
                           setDropdownOpen(false);
                           onOpenSettingsModal();
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-stone-700 hover:text-zinc-950 hover:bg-stone-50 rounded-xl text-left transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors min-h-[40px]"
                       >
-                        <Settings className="w-3.5 h-3.5 text-stone-500" />
-                        Account Settings
+                        <Settings className="w-4 h-4 text-zinc-400" />
+                        <span>Account Settings</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          signOut();
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-left transition-colors"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Sign Out
-                      </button>
+                      <div className="border-t border-white/[0.08] pt-1 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            signOut();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-xl text-left transition-colors min-h-[40px]"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
                     </div>
-                  </>
                 )}
               </div>
             ) : (
@@ -305,11 +320,11 @@ export default function Navbar({
                 type="button"
                 onClick={handleGoogleClick}
                 disabled={isAuthenticating}
-                className="flex items-center gap-1.5 sm:gap-2 bg-white hover:bg-stone-50 disabled:opacity-60 disabled:cursor-not-allowed border border-stone-200 hover:border-stone-300 text-zinc-800 text-xs font-semibold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl transition-all shadow-xs shrink-0 min-h-[36px]"
+                className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed text-xs font-semibold px-4 py-2 rounded-full transition-all shrink-0 min-h-[40px]"
               >
                 {isAuthenticating ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-black shrink-0" />
                     <span>Connecting...</span>
                   </>
                 ) : (
@@ -344,15 +359,15 @@ export default function Navbar({
 
       {/* Auth Error Banner with Dismiss */}
       {authError && (
-        <div className="bg-rose-50 border-b border-rose-200 px-3 sm:px-4 py-2 text-rose-800 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto flex-1 min-w-0">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+        <div className="bg-rose-950/60 border-b border-rose-500/30 px-4 py-2.5 text-rose-200 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 max-w-6xl mx-auto flex-1 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span className="truncate">{authError}</span>
           </div>
           <button
             type="button"
             onClick={clearAuthError}
-            className="p-1 hover:bg-rose-100 text-rose-700 rounded-md transition-colors shrink-0"
+            className="p-1 hover:bg-rose-900/50 text-rose-300 rounded-md transition-colors shrink-0"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />

@@ -31,19 +31,19 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
   // Prevent editing locked/undecrypted items
   if (item.is_private && !item._isDecrypted && item.title === '[Encrypted Item]') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
-        <div className="w-full max-w-md bg-white border border-stone-200 rounded-2xl p-6 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-            <h2 className="font-display text-base font-bold text-zinc-950">Item Locked</h2>
-            <button type="button" onClick={onClose} className="p-1.5 text-stone-400 hover:text-zinc-950 rounded-lg">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+        <div className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4 text-white">
+          <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+            <h2 className="font-display text-base font-bold text-white">Item Locked</h2>
+            <button type="button" onClick={onClose} className="p-1.5 text-zinc-400 hover:text-white rounded-lg">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <p className="text-xs text-stone-600">
+          <p className="text-xs text-zinc-400 leading-relaxed">
             This private item cannot be edited because it is currently encrypted with an unverified key. Please ensure your vault key is synced before editing.
           </p>
           <div className="flex justify-end pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-zinc-950 text-white text-xs font-semibold rounded-xl">
+            <button type="button" onClick={onClose} className="px-5 py-2 bg-white text-black text-xs font-semibold rounded-full">
               Close
             </button>
           </div>
@@ -119,17 +119,17 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-white">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
           <div>
-            <h2 className="font-display text-base font-bold text-zinc-950">Edit Recommendation</h2>
+            <h2 className="font-display text-base font-bold text-white">Edit Recommendation</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -138,7 +138,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
         <form onSubmit={handleSave} className="space-y-4">
           {/* Title */}
           <div>
-            <label htmlFor="edit-rec-title" className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="edit-rec-title" className="block text-xs font-semibold text-zinc-300 mb-1.5">
               Title / Name
             </label>
             <input
@@ -148,38 +148,43 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2.5 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+              className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors"
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
               Category
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-              {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategory(cat.id)}
-                  className={`py-2 px-2 text-xs font-medium border text-center rounded-xl transition-all cursor-pointer ${
-                    category === cat.id
-                      ? 'bg-zinc-950 text-white border-zinc-950 font-semibold shadow-xs'
-                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 hover:text-zinc-950'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+              {CATEGORIES.filter(c => c.id !== 'all').map(cat => {
+                const Icon = cat.icon
+                const isSelected = category === cat.id
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-mono border text-center rounded-xl transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-white text-black border-white font-semibold shadow-sm'
+                        : 'bg-[#1A1A1A] border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/20'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-black' : cat.color || 'text-zinc-400'}`} />
+                    <span className="truncate">{cat.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
           {/* Custom Category Input if 'other' is selected */}
           {category === 'other' && (
             <div>
-              <label htmlFor="edit-rec-custom-category" className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                Custom Category Label <span className="text-[#2D6A4F]">*</span>
+              <label htmlFor="edit-rec-custom-category" className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                Custom Category Label *
               </label>
               <input
                 id="edit-rec-custom-category"
@@ -188,15 +193,15 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                 required
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
-                placeholder="e.g. Podcast, Course, Hardware, Tool, Newsletter..."
-                className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+                placeholder="e.g. Podcast, Newsletter, Hardware..."
+                className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors"
               />
             </div>
           )}
 
           {/* Extra Details */}
           <div>
-            <label htmlFor="edit-rec-extra" className="block text-xs font-semibold text-zinc-800 mb-1.5">
+            <label htmlFor="edit-rec-extra" className="block text-xs font-semibold text-zinc-300 mb-1.5">
               {category === 'yt'
                 ? 'Channel Link'
                 : category === 'book'
@@ -217,17 +222,17 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
                   : category === 'book'
                   ? 'Author name'
                   : category === 'app'
-                  ? 'https://... or Play Store / App Store'
+                  ? 'https://... or Play Store'
                   : 'e.g. Netflix, Steam, HBO'
               }
-              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+              className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors font-mono"
             />
           </div>
 
           {/* Reason / Note */}
           <div>
-            <label htmlFor="edit-rec-note" className="block text-xs font-semibold text-zinc-800 mb-1.5">
-              Description of your recommendation
+            <label htmlFor="edit-rec-note" className="block text-xs font-semibold text-zinc-300 mb-1.5">
+              Curator's Note
             </label>
             <textarea
               id="edit-rec-note"
@@ -235,8 +240,8 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
               rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="What makes this worth someone's time?"
-              className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors resize-none"
+              placeholder="Why do you recommend this?"
+              className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors resize-none"
             />
           </div>
 
@@ -244,28 +249,28 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
           {status && (
             <div className={`p-2.5 text-xs font-medium rounded-xl ${
               status.type === 'error'
-                ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                ? 'bg-rose-950/60 text-rose-300 border border-rose-500/30'
                 : status.type === 'loading'
-                ? 'bg-stone-100 text-stone-700 border border-stone-200'
-                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                ? 'bg-white/[0.05] text-zinc-300 border border-white/10'
+                : 'bg-white/[0.08] text-white border border-white/20'
             }`}>
               {status.msg}
             </div>
           )}
 
           {/* Footer buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.08]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer min-h-[40px]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
+              className="flex items-center gap-1.5 px-6 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-colors disabled:opacity-50 cursor-pointer min-h-[40px]"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save Changes</span>

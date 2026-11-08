@@ -75,6 +75,14 @@ export async function syncUnifiedVault(arg1, arg2) {
     fallbackKeys
   }
 
+  if (typeof onPublicKeyReady === 'function') {
+    try {
+      onPublicKeyReady(JSON.stringify({ kty: 'EC', crv: 'P-256', alg: 'ECDH', kid: userId }))
+    } catch {
+      // non-fatal callback error
+    }
+  }
+
   cachedVaultKeys = result
   cachedUserId = userId
   return result

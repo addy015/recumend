@@ -9,7 +9,8 @@ export default function AddRecommendationModal({
   isOpen,
   onClose,
   initialPrivate = false,
-  initialCategory = 'movie'
+  initialCategory = 'movie',
+  onSuccess
 }) {
   const { items, addItem, toggleRecommend, userRecs, normalizeTitle } = useItems()
   const { user, signInWithGoogle } = useAuth()
@@ -101,12 +102,12 @@ export default function AddRecommendationModal({
       }
     }
 
-    // Submit new recommendation item
+    // Call addItem from context
     const res = await addItem({
       title: title.trim(),
       category,
       metadata,
-      is_private: isPrivate
+      isPrivate
     })
 
     setIsSubmitting(false)
@@ -121,32 +122,37 @@ export default function AddRecommendationModal({
       return
     }
 
-    // Success: close modal and clear form
+    // Success: notify parent, reset form, and close dialog
+    onSuccess?.({ isPrivate, item: res.item })
     resetForm()
     onClose()
   }
 
-  // Upvote item directly from matching suggestions
-  const handleRecommendExisting = async (existingId) => {
-    if (!user) {
-      signInWithGoogle()
+  // Immediately upvote an existing matching recommendation
+  const handleRecommendExisting = async (itemId) => {
+    const res = await toggleRecommend(itemId)
+    if (res?.error) {
+      setStatus({ type: 'error', msg: res.error })
       return
     }
-    await toggleRecommend(existingId)
+    const upvotedItem = items.find(i => i.id === itemId)
+    resetForm()
+    onClose()
+    onSuccess?.({ isPrivate: false, item: upvotedItem, isUpvote: true })
   }
 
-  // Confirm upvote on duplicate detection prompt
+  // Confirm upvote on duplicate modal
   const handleConfirmUpvote = async () => {
     if (!duplicateCandidate) return
-    if (!user) {
-      signInWithGoogle()
+    const res = await toggleRecommend(duplicateCandidate.id)
+    if (res?.error) {
+      setStatus({ type: 'error', msg: res.error })
       return
     }
-    if (!userRecs.has(duplicateCandidate.id)) {
-      await toggleRecommend(duplicateCandidate.id)
-    }
+    const upvotedItem = duplicateCandidate
     resetForm()
     onClose()
+    onSuccess?.({ isPrivate: false, item: upvotedItem, isUpvote: true })
   }
 
   // Dismiss duplicate prompt without upvoting
@@ -156,18 +162,17 @@ export default function AddRecommendationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 text-white">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
           <div>
-            <h2 className="font-display text-base font-bold text-zinc-950">Add Recommendation</h2>
-            <p className="text-xs text-stone-500">Search first to prevent duplicate entries</p>
+            <h2 className="font-display text-base font-bold text-white">Add Recommendation</h2>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            className="p-1.5 text-stone-400 hover:text-zinc-950 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -176,31 +181,31 @@ export default function AddRecommendationModal({
         {duplicateCandidate ? (
           /* Duplicate Decision Prompt Card */
           <div className="space-y-4 py-1">
-            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-3">
-              <div className="flex items-start gap-2.5 text-amber-800">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+            <div className="p-4 bg-white/[0.04] border border-white/[0.12] rounded-xl space-y-3">
+              <div className="flex items-start gap-2.5 text-zinc-200">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-zinc-400" />
                 <div>
-                  <h3 className="font-display text-sm font-bold text-zinc-950">
+                  <h3 className="font-display text-sm font-bold text-white">
                     Already recommended on site
                   </h3>
-                  <p className="text-xs text-stone-600 mt-0.5">
+                  <p className="text-xs text-zinc-400 mt-0.5">
                     "{duplicateCandidate.title}" is already on the leaderboard.
                   </p>
                 </div>
               </div>
 
               {/* Existing item snapshot */}
-              <div className="p-3 bg-white border border-stone-200 rounded-xl flex items-center justify-between text-xs">
+              <div className="p-3 bg-[#1A1A1A] border border-white/[0.08] rounded-xl flex items-center justify-between text-xs">
                 <div>
-                  <div className="font-display font-bold text-zinc-950 text-sm">
+                  <div className="font-display font-bold text-white text-sm">
                     {duplicateCandidate.title}
                   </div>
-                  <div className="text-[11px] text-stone-500 font-mono mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="uppercase text-stone-800 bg-stone-100 px-2 py-0.5 rounded-full border border-stone-200 font-semibold">
+                  <div className="text-[11px] text-zinc-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
+                    <span className="uppercase text-zinc-300 bg-white/[0.06] px-2 py-0.5 rounded-md border border-white/[0.08]">
                       {CATEGORIES.find(c => c.id === duplicateCandidate.category)?.label || duplicateCandidate.category}
                     </span>
                     <span>•</span>
-                    <span>★ {duplicateCandidate.recommend_count} recommendations</span>
+                    <span>{duplicateCandidate.recommend_count} recommendations</span>
                     {duplicateCandidate.creator?.username && (
                       <>
                         <span>•</span>
@@ -211,7 +216,7 @@ export default function AddRecommendationModal({
                 </div>
               </div>
 
-              <p className="text-xs text-stone-700 leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 {userRecs.has(duplicateCandidate.id)
                   ? 'You have already upvoted this recommendation.'
                   : 'Would you like to upvote this recommendation to add it to your recommendations?'}
@@ -223,7 +228,7 @@ export default function AddRecommendationModal({
               <button
                 type="button"
                 onClick={handleDismissDuplicate}
-                className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer"
               >
                 {userRecs.has(duplicateCandidate.id) ? 'Close' : "No, Don't Upvote"}
               </button>
@@ -232,7 +237,7 @@ export default function AddRecommendationModal({
                 <button
                   type="button"
                   onClick={handleConfirmUpvote}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                  className="flex items-center gap-1.5 px-5 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>Yes, Upvote (+1)</span>
@@ -244,7 +249,7 @@ export default function AddRecommendationModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Title Input */}
             <div>
-              <label htmlFor="add-rec-title" className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="add-rec-title" className="block text-xs font-semibold text-zinc-300 mb-1.5">
                 Title / Name
               </label>
               <input
@@ -255,38 +260,38 @@ export default function AddRecommendationModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Severance, Interstellar, Atomic Habits..."
-                className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2.5 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+                className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors"
               />
             </div>
 
             {/* Live Deduplication Alert while typing */}
             {matchingExistingItems.length > 0 && (
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Already recommended on site:</span>
+              <div className="p-3 bg-white/[0.04] border border-white/[0.1] rounded-xl space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
+                  <AlertCircle className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Existing recommendations match:</span>
                 </div>
                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                   {matchingExistingItems.map(it => {
                     const alreadyVoted = userRecs.has(it.id)
                     return (
-                      <div key={it.id} className="flex items-center justify-between p-2 bg-white border border-stone-200 rounded-lg text-xs">
+                      <div key={it.id} className="flex items-center justify-between p-2 bg-[#1A1A1A] border border-white/[0.08] rounded-lg text-xs">
                         <div>
-                          <span className="font-semibold text-zinc-900">{it.title}</span>
-                          <span className="text-[10px] text-stone-500 ml-2 font-mono uppercase">({it.category})</span>
-                          <span className="text-[10px] text-stone-500 ml-2">★ {it.recommend_count} recs</span>
+                          <span className="font-semibold text-white">{it.title}</span>
+                          <span className="text-[10px] text-zinc-500 ml-2 font-mono uppercase">({it.category})</span>
+                          <span className="text-[10px] text-zinc-500 ml-2 font-mono">{it.recommend_count} recs</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRecommendExisting(it.id)}
-                          className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg flex items-center gap-1 cursor-pointer transition-colors ${
+                          className={`px-3 py-1 text-[11px] font-semibold rounded-full flex items-center gap-1 cursor-pointer transition-colors ${
                             alreadyVoted
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              : 'bg-zinc-950 text-white hover:bg-zinc-800'
+                              ? 'bg-white/10 text-zinc-400 border border-white/10'
+                              : 'bg-white text-black hover:bg-zinc-200'
                           }`}
                         >
-                          {alreadyVoted ? <Check className="w-3.5 h-3.5" /> : '+1'}
-                          {alreadyVoted ? 'Voted' : 'Vote This'}
+                          {alreadyVoted ? <Check className="w-3 h-3" /> : '+1 '}
+                          {alreadyVoted ? 'Upvoted' : 'Upvote'}
                         </button>
                       </div>
                     )
@@ -297,32 +302,37 @@ export default function AddRecommendationModal({
 
             {/* Category Selector */}
             <div>
-              <label className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
                 Category
               </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategory(cat.id)}
-                    className={`py-2 px-2 text-xs font-medium border text-center rounded-xl transition-all cursor-pointer ${
-                      category === cat.id
-                        ? 'bg-zinc-950 text-white border-zinc-950 font-semibold shadow-xs'
-                        : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 hover:text-zinc-950'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                {CATEGORIES.filter(c => c.id !== 'all').map(cat => {
+                  const Icon = cat.icon
+                  const isSelected = category === cat.id
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategory(cat.id)}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2 text-xs font-mono border text-center rounded-xl transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-white text-black border-white font-semibold shadow-sm'
+                          : 'bg-[#1A1A1A] border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-black' : cat.color || 'text-zinc-400'}`} />
+                      <span className="truncate">{cat.label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
             {/* Custom Category Input if 'other' is selected */}
             {category === 'other' && (
               <div>
-                <label htmlFor="add-rec-custom-category" className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                  Custom Category Label <span className="text-[#2D6A4F]">*</span>
+                <label htmlFor="add-rec-custom-category" className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                  Custom Category Label *
                 </label>
                 <input
                   id="add-rec-custom-category"
@@ -331,15 +341,15 @@ export default function AddRecommendationModal({
                   required
                   value={customCategory}
                   onChange={(e) => setCustomCategory(e.target.value)}
-                  placeholder="e.g. Podcast, Course, Hardware, Tool, Newsletter..."
-                  className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+                  placeholder="e.g. Podcast, Newsletter, Hardware, Essay..."
+                  className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors"
                 />
               </div>
             )}
 
             {/* Extra Details */}
             <div>
-              <label htmlFor="add-rec-extra" className="block text-xs font-semibold text-zinc-800 mb-1.5">
+              <label htmlFor="add-rec-extra" className="block text-xs font-semibold text-zinc-300 mb-1.5">
                 {category === 'yt'
                   ? 'Channel Link'
                   : category === 'book'
@@ -360,17 +370,17 @@ export default function AddRecommendationModal({
                     : category === 'book'
                     ? 'Author name'
                     : category === 'app'
-                    ? 'https://... or Play Store / App Store'
-                    : 'e.g. Netflix, Steam, HBO'
+                    ? 'https://... or App Store'
+                    : 'e.g. Netflix, Steam, Criterion, HBO'
                 }
-                className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors"
+                className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors font-mono"
               />
             </div>
 
             {/* User Review / Note */}
             <div>
-              <label htmlFor="add-rec-note" className="block text-xs font-semibold text-zinc-800 mb-1.5">
-                Description of your recommendation
+              <label htmlFor="add-rec-note" className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                Curator's Note
               </label>
               <textarea
                 id="add-rec-note"
@@ -378,16 +388,16 @@ export default function AddRecommendationModal({
                 rows={2}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="What makes this worth someone's time?"
-                className="w-full bg-stone-50 border border-stone-200 px-3.5 py-2 text-xs text-zinc-950 placeholder:text-stone-400 rounded-xl focus:outline-none focus:border-stone-400 focus:bg-white transition-colors resize-none"
+                placeholder="Why do you recommend this?"
+                className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors resize-none"
               />
             </div>
 
             {/* Private Watchlist Checkbox Toggle */}
-            <div className={`p-3 border rounded-xl transition-all duration-150 ${
+            <div className={`p-3.5 border rounded-xl transition-all duration-150 ${
               isPrivate
-                ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
-                : 'bg-stone-50 border-stone-200'
+                ? 'bg-white/[0.06] border-white/20'
+                : 'bg-[#1A1A1A] border-white/[0.08]'
             }`}>
               <label htmlFor="add-rec-private-toggle" className="flex items-start gap-2.5 cursor-pointer select-none">
                 <input
@@ -396,15 +406,15 @@ export default function AddRecommendationModal({
                   type="checkbox"
                   checked={isPrivate}
                   onChange={(e) => setIsPrivate(e.target.checked)}
-                  className="mt-0.5 rounded border-stone-300 text-emerald-700 focus:ring-0 cursor-pointer"
+                  className="mt-0.5 rounded border-zinc-700 bg-zinc-800 text-white focus:ring-0 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900">
-                    <Lock className={`w-3.5 h-3.5 transition-colors ${isPrivate ? 'text-emerald-700' : 'text-stone-500'}`} />
-                    <span className={isPrivate ? 'text-emerald-950 font-bold' : ''}>Save as Private (E2EE Vault)</span>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                    <Lock className={`w-3.5 h-3.5 transition-colors ${isPrivate ? 'text-white' : 'text-zinc-500'}`} />
+                    <span>Save to Private Vault</span>
                   </div>
-                  <p className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">
-                    Encrypted client-side with your Google Drive key. Hidden from the public feed and database admins.
+                  <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed font-mono">
+                    Hidden from the public feed.
                   </p>
                 </div>
               </label>
@@ -413,28 +423,28 @@ export default function AddRecommendationModal({
             {/* Feedback message */}
             {status && (
               <div className={`p-2.5 text-xs font-medium rounded-xl ${
-                status.type === 'error' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                status.type === 'error' ? 'bg-rose-950/60 text-rose-300 border border-rose-500/30' : 'bg-white/[0.08] text-white border border-white/20'
               }`}>
                 {status.msg}
               </div>
             )}
 
             {/* Action buttons */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer min-h-[40px]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs disabled:opacity-60 cursor-pointer"
+                className="flex items-center gap-1.5 px-6 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all disabled:opacity-60 cursor-pointer min-h-[40px]"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{isSubmitting ? 'Saving...' : isPrivate ? 'Save to Private Vault' : 'Submit Recommendation'}</span>
+                <span>{isSubmitting ? 'Saving...' : isPrivate ? 'Save to Vault' : 'Publish Recommendation'}</span>
               </button>
             </div>
           </form>

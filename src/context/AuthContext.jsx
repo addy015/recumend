@@ -267,17 +267,12 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      // Trigger OAuth flow with redirect to /feed and Google Drive appDataFolder scope
+      // Trigger standard Google OAuth flow with redirect to /feed
       const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/feed` : ''
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUri,
-          scopes: 'https://www.googleapis.com/auth/drive.appdata',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
+          redirectTo: redirectUri
         }
       })
 

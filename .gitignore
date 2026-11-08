@@ -61,16 +61,27 @@ desktop.ini
 
 # Project tooling & AI
 graphify-out/
+.graphify_*
 .claude/
 .gemini/
 .antigravity/
+.agents/
+.taste-skill/
+skills-lock.json
 
-# Scratch & Dev Notes
+# Scratch & Dev Notes / Test Files
 CurrentIssue.md
 Features.md
 feature*.md
 Security.md
 README.md
+demo.html
+demo*.html
+test.jsx
+test.js
+test.tsx
+test.ts
+*.scratch.*
 
 # Vercel
 .vercel/

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Bookmark,
   Edit3,
@@ -11,34 +11,13 @@ import {
   Lock,
   Globe,
   Loader2,
-  Search,
+  Search
 } from "lucide-react";
 import { useItems } from "../context/ItemContext";
-import { CATEGORIES } from "../constants/categories";
+import { CATEGORIES, getCategoryBadgeClass } from "../constants/categories";
 import { getSafeExternalLink } from "../lib/avatar";
 import CategoryFilter from "./CategoryFilter";
 import EditRecommendationModal from "./EditRecommendationModal";
-
-// Category badge color lookup matching community leaderboard styling
-function getCategoryBadgeClass(category) {
-  switch (category) {
-    case 'movie':
-      return 'bg-amber-50 text-amber-900 border-amber-200/80';
-    case 'anime':
-      return 'bg-indigo-50 text-indigo-900 border-indigo-200/80';
-    case 'book':
-      return 'bg-emerald-50 text-emerald-900 border-emerald-200/80';
-    case 'game':
-      return 'bg-rose-50 text-rose-900 border-rose-200/80';
-    case 'yt':
-    case 'webseries':
-      return 'bg-orange-50 text-orange-900 border-orange-200/80';
-    case 'app':
-    case 'other':
-    default:
-      return 'bg-stone-100 text-stone-800 border-stone-200/90';
-  }
-}
 
 // User dashboard for managing personal created recommendations, private vault items, and endorsements
 export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) {
@@ -50,11 +29,13 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
     toggleRecommend,
     toggleItemPrivacy,
     vaultError,
+    refreshPrivateItems,
   } = useItems();
 
   // Active sub-tab ('created' | 'private' | 'upvoted')
   const [activeTab, setActiveTab] = useState("created");
   const [createdCategory, setCreatedCategory] = useState("all");
+  const [upvotedCategory, setUpvotedCategory] = useState("all");
   const [vaultCategory, setVaultCategory] = useState("all");
   const [editingItem, setEditingItem] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -63,7 +44,14 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
   const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
-  // Filter created public items by category and search query
+  // Auto-fetch private items if vault is empty on tab switch (avoids needing full page reload)
+  useEffect(() => {
+    if (activeTab === "private" && myPrivateItems.length === 0) {
+      refreshPrivateItems?.();
+    }
+  }, [activeTab, myPrivateItems.length, refreshPrivateItems]);
+
+  // Filter created public items by category and search query (Strictly sorted created_at DESC)
   const filteredCreatedItems = useMemo(() => {
     let result = [...myItems];
 
@@ -84,27 +72,50 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
       });
     }
 
+    result.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
+
     return result;
   }, [myItems, createdCategory, searchQuery]);
 
-  // Filter upvoted items by search query
+  // Filter upvoted items by category and search query (Strictly sorted created_at DESC)
   const filteredUpvotedItems = useMemo(() => {
-    if (!searchQuery?.trim()) return upvotedItems;
-    const q = searchQuery.trim().toLowerCase();
-    return upvotedItems.filter((item) => {
-      const matchTitle = (item.title || "").toLowerCase().includes(q);
-      const matchCategory = (item.category || "").toLowerCase().includes(q);
-      const matchCustomCat = (item.metadata?.custom_category || "").toLowerCase().includes(q);
-      const matchNote = (item.metadata?.note || "").toLowerCase().includes(q);
-      const matchAuthor = (item.metadata?.author || "").toLowerCase().includes(q);
-      const matchPlatform = (item.metadata?.platform || "").toLowerCase().includes(q);
-      const matchCreator = (item.creator?.username || "").toLowerCase().includes(q) ||
-        (item.creator?.display_name || "").toLowerCase().includes(q);
-      return matchTitle || matchCategory || matchCustomCat || matchNote || matchAuthor || matchPlatform || matchCreator;
-    });
-  }, [upvotedItems, searchQuery]);
+    let result = [...upvotedItems];
 
-  // Filter private vault items by category and search query
+    if (upvotedCategory !== "all") {
+      result = result.filter((item) => item.category === upvotedCategory);
+    }
+
+    if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter((item) => {
+        const matchTitle = (item.title || "").toLowerCase().includes(q);
+        const matchCategory = (item.category || "").toLowerCase().includes(q);
+        const matchCustomCat = (item.metadata?.custom_category || "").toLowerCase().includes(q);
+        const matchNote = (item.metadata?.note || "").toLowerCase().includes(q);
+        const matchAuthor = (item.metadata?.author || "").toLowerCase().includes(q);
+        const matchPlatform = (item.metadata?.platform || "").toLowerCase().includes(q);
+        const matchCreator = (item.creator?.username || "").toLowerCase().includes(q) ||
+          (item.creator?.display_name || "").toLowerCase().includes(q);
+        return matchTitle || matchCategory || matchCustomCat || matchNote || matchAuthor || matchPlatform || matchCreator;
+      });
+    }
+
+    result.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
+
+    return result;
+  }, [upvotedItems, upvotedCategory, searchQuery]);
+
+  // Filter private vault items by category and search query (Strictly sorted created_at DESC)
   const filteredPrivateItems = useMemo(() => {
     let result = [...myPrivateItems];
 
@@ -132,6 +143,13 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         );
       });
     }
+
+    result.sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (dateB !== dateA) return dateB - dateA;
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
 
     return result;
   }, [myPrivateItems, vaultCategory, searchQuery]);
@@ -162,41 +180,44 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 border-b border-stone-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>
-          <h2 className="font-display text-lg sm:text-xl font-bold tracking-tight text-zinc-950 flex items-center gap-2">
-            <Bookmark className="w-5 h-5 text-emerald-600" />
-            My Recom  mendations
+          <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <Bookmark className="w-5 h-5 text-zinc-400" />
+            <span>Vault & Curation</span>
           </h2>
+          <p className="text-xs text-zinc-500 font-mono mt-1">
+            Personal recommendations, private encrypted vault, and community endorsements.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto">
+        <div className="flex items-center gap-3 self-start sm:self-auto">
           <button
             type="button"
             onClick={() =>
               onOpenAddModal?.({ isPrivate: activeTab === "private" })
             }
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Rec</span>
+            <Plus className="w-4 h-4" />
+            <span>Add Title</span>
           </button>
         </div>
       </div>
 
       {/* Error Alert */}
       {errorMessage && (
-        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-150">
+        <div className="p-3.5 bg-rose-950/60 border border-rose-500/30 text-rose-200 text-xs rounded-xl flex items-center justify-between gap-2 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{errorMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-rose-700 hover:text-rose-900 text-xs px-2 py-0.5 hover:bg-rose-100 rounded transition-colors cursor-pointer"
+            className="text-rose-300 hover:text-white text-xs px-2 py-0.5 hover:bg-rose-900/50 rounded transition-colors cursor-pointer"
           >
             Dismiss
           </button>
@@ -205,25 +226,25 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
 
       {/* Vault Error Notice */}
       {vaultError && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-xs text-rose-800">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+        <div className="p-3.5 bg-rose-950/60 border border-rose-500/30 rounded-xl flex items-center gap-2 text-xs text-rose-200">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>Vault notice: {vaultError}</span>
         </div>
       )}
 
-      {/* 3 Tabs: Created, Private Vault, Upvoted */}
-      <div className="flex border-b border-stone-200 gap-4 sm:gap-6 overflow-x-auto">
+      {/* Sub-Tabs: Created, Upvoted, Private Vault */}
+      <div className="flex border-b border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab("created")}
-          className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "created"
-              ? "border-zinc-950 text-zinc-950"
-              : "border-transparent text-stone-500 hover:text-zinc-900"
+              ? "border-white text-white font-bold"
+              : "border-transparent text-zinc-500 hover:text-white"
           }`}
         >
           <span>Created (Public)</span>
-          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-700">
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300">
             {createdCategory !== "all" || searchQuery?.trim()
               ? `${filteredCreatedItems.length}/${myItems.length}`
               : myItems.length}
@@ -233,30 +254,33 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         <button
           type="button"
           onClick={() => setActiveTab("upvoted")}
-          className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "upvoted"
-              ? "border-zinc-950 text-zinc-950"
-              : "border-transparent text-stone-500 hover:text-zinc-900"
+              ? "border-white text-white font-bold"
+              : "border-transparent text-zinc-500 hover:text-white"
           }`}
         >
+          <Heart className={`w-3.5 h-3.5 ${activeTab === "upvoted" ? "text-rose-500 fill-rose-500" : "text-rose-400"}`} />
           <span>Upvoted</span>
-          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-stone-100 text-stone-700">
-            {searchQuery?.trim() ? `${filteredUpvotedItems.length}/${upvotedItems.length}` : upvotedItems.length}
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300">
+            {upvotedCategory !== "all" || searchQuery?.trim()
+              ? `${filteredUpvotedItems.length}/${upvotedItems.length}`
+              : upvotedItems.length}
           </span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab("private")}
-          className={`pb-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "private"
-              ? "border-zinc-950 text-zinc-950"
-              : "border-transparent text-stone-500 hover:text-zinc-900"
+              ? "border-white text-white font-bold"
+              : "border-transparent text-zinc-500 hover:text-white"
           }`}
         >
-          <Lock className="w-3.5 h-3.5 text-emerald-700" />
+          <Lock className="w-3.5 h-3.5" />
           <span>Private Vault</span>
-          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60">
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300 font-bold border border-white/[0.1]">
             {vaultCategory !== "all" || searchQuery?.trim()
               ? `${filteredPrivateItems.length}/${myPrivateItems.length}`
               : myPrivateItems.length}
@@ -267,22 +291,24 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
       {/* TAB 1: CREATED (PUBLIC) ITEMS */}
       {activeTab === "created" && (
         <div className="space-y-4">
-          {/* Category Filter Chips matching Community Leaderboard */}
           <CategoryFilter
             selectedCategory={createdCategory}
             onSelectCategory={setCreatedCategory}
           />
 
           {myItems.length === 0 ? (
-            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-              <Bookmark className="w-8 h-8 text-stone-400 mx-auto" />
-              <p className="font-display text-sm font-bold text-zinc-950">
-                You haven't added any public recommendations yet
-              </p>
-              <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                Recommend your favorite movies, anime, books, or YouTube channels
-                to put them on the global leaderboard.
-              </p>
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
+                <Bookmark className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-display text-sm font-semibold text-white">
+                  You haven't added any public recommendations yet
+                </p>
+                <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                  Recommend your favorite movies, anime, books, or games to place them on the community leaderboard.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -291,19 +317,19 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                     category: createdCategory !== "all" ? createdCategory : "movie",
                   })
                 }
-                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Your First Recommendation</span>
+                <Plus className="w-4 h-4" />
+                <span>Add First Recommendation</span>
               </button>
             </div>
           ) : filteredCreatedItems.length === 0 ? (
-            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-              <Search className="w-8 h-8 text-stone-400 mx-auto" />
-              <p className="font-display text-sm font-bold text-zinc-950">
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <Search className="w-6 h-6 text-zinc-600 mx-auto" />
+              <p className="font-display text-sm font-semibold text-white">
                 No recommendations found
               </p>
-              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
                 {searchQuery?.trim()
                   ? `No public recommendations matching "${searchQuery}".`
                   : `You haven't added any public recommendations in "${CATEGORIES.find((c) => c.id === createdCategory)?.label || createdCategory}" yet.`}
@@ -312,7 +338,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                 <button
                   type="button"
                   onClick={() => setCreatedCategory("all")}
-                  className="mt-2 px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                  className="mt-2 px-4 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold rounded-full transition-colors cursor-pointer min-h-[36px]"
                 >
                   View All ({myItems.length})
                 </button>
@@ -323,123 +349,226 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               {filteredCreatedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white hover:bg-white border border-stone-200/90 hover:border-stone-300 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
                 >
-                  {/* Item Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
+                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-md font-medium border ${getCategoryBadgeClass(item.category)}`}>
                         {item.category === "other" &&
                         item.metadata?.custom_category
                           ? item.metadata.custom_category
                           : CATEGORIES.find((c) => c.id === item.category)
                               ?.label || item.category}
                       </span>
-                    {item.metadata?.year && (
-                      <span className="text-xs font-mono text-stone-500">
-                        {item.metadata.year}
-                      </span>
+                      {item.metadata?.year && (
+                        <span>{item.metadata.year}</span>
+                      )}
+                      {item.metadata?.author && (
+                        <span className="truncate">
+                          by <strong className="text-zinc-300">{item.metadata.author}</strong>
+                        </span>
+                      )}
+                      {item.metadata?.platform && (
+                        <span>• {item.metadata.platform}</span>
+                      )}
+                    </div>
+
+                    <h3 className="font-display font-bold text-sm sm:text-base text-white break-words line-clamp-2">
+                      {item.title}
+                    </h3>
+
+                    {item.metadata?.note && (
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
+                        "{item.metadata.note}"
+                      </p>
                     )}
-                    {item.metadata?.author && (
-                      <span className="text-xs text-stone-600 truncate">
-                        by {item.metadata.author}
-                      </span>
-                    )}
-                    {item.metadata?.platform && (
-                      <span className="text-xs text-stone-500">
-                        • {item.metadata.platform}
-                      </span>
+
+                    {getSafeExternalLink(item.metadata?.channel_link) && (
+                      <a
+                        href={getSafeExternalLink(item.metadata.channel_link)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white mt-1 transition-colors"
+                      >
+                        <span>Visit Link</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
                     )}
                   </div>
 
-                  <h3 className="font-display font-bold text-sm sm:text-base text-zinc-950 break-words line-clamp-2">
-                    {item.title}
-                  </h3>
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
+                    <div className="flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-300">
+                      <ArrowBigUp className="w-4 h-4 text-zinc-400" />
+                      <span className="font-bold">{item.recommend_count}</span>
+                      <span className="text-zinc-500 text-[11px]">votes</span>
+                    </div>
 
-                  {item.metadata?.note && (
-                    <p className="text-xs text-stone-600 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-stone-200 pl-2.5 italic">
-                      "{item.metadata.note}"
-                    </p>
-                  )}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrivacyModalItem(item)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
+                        title="Move to Private Vault (E2EE)"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="hidden sm:inline">Make Private</span>
+                      </button>
 
-                  {getSafeExternalLink(item.metadata?.channel_link) && (
-                    <a
-                      href={getSafeExternalLink(item.metadata.channel_link)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-mono text-stone-600 hover:text-[#2D6A4F] mt-1.5 transition-colors"
-                    >
-                      <span>Visit Link</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem(item)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
+                        title="Edit recommendation details"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span>Edit</span>
+                      </button>
 
-                {/* Vote Count & Action Buttons */}
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-stone-100 sm:border-t-0">
-                  <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-mono text-stone-700">
-                    <ArrowBigUp className="w-4 h-4 fill-emerald-600 stroke-emerald-600" />
-                    <span className="font-bold">{item.recommend_count}</span>
-                    <span className="text-stone-400 text-[11px]">votes</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPrivacyModalItem(item)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-stone-50 text-stone-700 text-xs font-medium transition-colors border border-stone-200 rounded-xl shadow-xs cursor-pointer"
-                      title="Move to Private Vault (E2EE)"
-                    >
-                      <Lock className="w-3.5 h-3.5 text-stone-500" />
-                      <span className="hidden sm:inline">Make Private</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setEditingItem(item)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 text-xs font-medium transition-colors border border-stone-200 rounded-xl shadow-xs cursor-pointer"
-                      title="Edit recommendation details"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-stone-400" />
-                      <span>Edit</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDeleteConfirmItem(item)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium transition-colors border border-rose-200 rounded-xl cursor-pointer"
-                      title="Delete recommendation globally"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Delete</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmItem(item)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/20 rounded-xl cursor-pointer min-h-[40px]"
+                        title="Delete recommendation globally"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* TAB 2: PRIVATE E2EE VAULT ITEMS */}
+      {/* TAB 2: UPVOTED ITEMS */}
+      {activeTab === "upvoted" && (
+        <div className="space-y-4">
+          <CategoryFilter
+            selectedCategory={upvotedCategory}
+            onSelectCategory={setUpvotedCategory}
+          />
+
+          {upvotedItems.length === 0 ? (
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <Heart className="w-8 h-8 text-rose-500/40 mx-auto" />
+              <p className="font-display text-sm font-semibold text-white">
+                No upvoted recommendations yet
+              </p>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                Browse the community leaderboard and endorse titles you love.
+              </p>
+            </div>
+          ) : filteredUpvotedItems.length === 0 ? (
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <Search className="w-6 h-6 text-zinc-600 mx-auto" />
+              <p className="font-display text-sm font-semibold text-white">
+                No upvoted recommendations found
+              </p>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                {searchQuery?.trim()
+                  ? `No upvoted recommendations matching "${searchQuery}".`
+                  : `You haven't upvoted any recommendations in "${CATEGORIES.find((c) => c.id === upvotedCategory)?.label || upvotedCategory}" yet.`}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredUpvotedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
+                >
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
+                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-md font-medium border ${getCategoryBadgeClass(item.category)}`}>
+                        {item.category === "other" &&
+                        item.metadata?.custom_category
+                          ? item.metadata.custom_category
+                          : CATEGORIES.find((c) => c.id === item.category)
+                              ?.label || item.category}
+                      </span>
+                      {item.metadata?.year && (
+                        <span>{item.metadata.year}</span>
+                      )}
+                      {item.metadata?.author && (
+                        <span className="truncate">
+                          by <strong className="text-zinc-300">{item.metadata.author}</strong>
+                        </span>
+                      )}
+                      {item.metadata?.platform && (
+                        <span>• {item.metadata.platform}</span>
+                      )}
+                    </div>
+
+                    <h3 className="font-display font-bold text-sm sm:text-base text-white break-words line-clamp-2">
+                      {item.title}
+                    </h3>
+
+                    {item.metadata?.note && (
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
+                        "{item.metadata.note}"
+                      </p>
+                    )}
+
+                    {getSafeExternalLink(item.metadata?.channel_link) && (
+                      <a
+                        href={getSafeExternalLink(item.metadata.channel_link)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white mt-1 transition-colors"
+                      >
+                        <span>Visit Link</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleRecommend(item.id)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-black text-xs font-mono font-medium rounded-full transition-colors group cursor-pointer min-h-[40px] shadow-[0_0_12px_rgba(251,191,36,0.2)]"
+                      title="Click to remove upvote"
+                    >
+                      <ArrowBigUp className="w-4 h-4 fill-black stroke-black group-hover:fill-rose-600 group-hover:stroke-rose-600" />
+                      <span className="font-bold">{item.recommend_count}</span>
+                      <span className="text-[11px] group-hover:hidden">
+                        Upvoted
+                      </span>
+                      <span className="text-[11px] hidden group-hover:inline text-rose-600">
+                        Remove
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: PRIVATE E2EE VAULT ITEMS */}
       {activeTab === "private" && (
         <div className="space-y-4">
-          {/* Category Filter Chips */}
           <CategoryFilter
             selectedCategory={vaultCategory}
             onSelectCategory={setVaultCategory}
           />
 
           {myPrivateItems.length === 0 ? (
-            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-              <Lock className="w-8 h-8 text-stone-400 mx-auto" />
-              <p className="font-display text-sm font-bold text-zinc-950">
-                Your private vault is empty
-              </p>
-              <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                Save your guilty pleasures or private watchlist items.
-              </p>
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="font-display text-sm font-semibold text-white">
+                  Your private vault is empty
+                </p>
+                <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                  Store personal watchlists or confidential recommendations protected with client-side Web Crypto AES-GCM encryption.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -448,19 +577,19 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                     category: vaultCategory !== "all" ? vaultCategory : "movie",
                   })
                 }
-                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 <span>Add Private Recommendation</span>
               </button>
             </div>
           ) : filteredPrivateItems.length === 0 ? (
-            <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-              <Search className="w-8 h-8 text-stone-400 mx-auto" />
-              <p className="font-display text-sm font-bold text-zinc-950">
+            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+              <Search className="w-6 h-6 text-zinc-600 mx-auto" />
+              <p className="font-display text-sm font-semibold text-white">
                 No private recommendations found
               </p>
-              <p className="text-xs text-stone-500 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto">
                 {searchQuery?.trim()
                   ? `No private items matching "${searchQuery}" in this category.`
                   : `You haven't added any private recommendations in "${CATEGORIES.find((c) => c.id === vaultCategory)?.label || vaultCategory}" yet.`}
@@ -470,7 +599,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                   <button
                     type="button"
                     onClick={() => setVaultCategory("all")}
-                    className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                    className="px-4 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold rounded-full transition-colors cursor-pointer min-h-[36px]"
                   >
                     View All ({myPrivateItems.length})
                   </button>
@@ -483,14 +612,14 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                       category: vaultCategory !== "all" ? vaultCategory : "movie",
                     })
                   }
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[36px]"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>
                     Add in{" "}
                     {vaultCategory !== "all"
                       ? CATEGORIES.find((c) => c.id === vaultCategory)?.label || "Category"
-                      : "Private Vault"}
+                      : "Vault"}
                   </span>
                 </button>
               </div>
@@ -500,58 +629,50 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               {filteredPrivateItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white border border-emerald-900/10 hover:border-emerald-700/30 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
+                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
                 >
-                  {/* Item Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
+                      <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-md font-medium border ${getCategoryBadgeClass(item.category)}`}>
                         {item.category === "other" &&
                         item.metadata?.custom_category
                           ? item.metadata.custom_category
                           : CATEGORIES.find((c) => c.id === item.category)
                               ?.label || item.category}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full font-semibold">
-                        <Lock className="w-3 h-3 text-emerald-700" />
-                        <span>E2EE Private</span>
-                      </span>
                       {item.metadata?.year && (
-                        <span className="text-xs font-mono text-stone-500">
-                          {item.metadata.year}
-                        </span>
+                        <span>{item.metadata.year}</span>
                       )}
                       {item.metadata?.author && (
-                        <span className="text-xs text-stone-600 truncate">
-                          by {item.metadata.author}
+                        <span className="truncate">
+                          by <strong className="text-zinc-300">{item.metadata.author}</strong>
                         </span>
                       )}
                       {item.metadata?.platform && (
-                        <span className="text-xs text-stone-500">
-                          • {item.metadata.platform}
-                        </span>
+                        <span>• {item.metadata.platform}</span>
                       )}
+
                     </div>
 
-                    <h3 className="font-display font-bold text-sm sm:text-base text-zinc-950 break-words line-clamp-2">
+                    <h3 className="font-display font-bold text-sm sm:text-base text-white break-words line-clamp-2">
                       {item._isDecrypted ||
                       (item.title && item.title !== "[Encrypted Item]") ? (
                         item.title
                       ) : item._decryptionFailed || vaultError ? (
-                        <span className="inline-flex items-center gap-1.5 text-stone-500 font-mono text-xs bg-stone-100 px-2 py-0.5 rounded-md border border-stone-200">
-                          <Lock className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 text-zinc-500 font-mono text-xs bg-white/[0.05] px-2 py-0.5 rounded-md border border-white/[0.1]">
+                          <Lock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                           <span>Encrypted</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-stone-400 font-mono text-xs">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-400 shrink-0" />
+                        <span className="inline-flex items-center gap-1.5 text-zinc-500 font-mono text-xs">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400 shrink-0" />
                           <span>Decrypting...</span>
                         </span>
                       )}
                     </h3>
 
                     {item.metadata?.note && (
-                      <p className="text-xs text-stone-600 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-emerald-200 pl-2.5 italic">
+                      <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
                         "{item.metadata.note}"
                       </p>
                     )}
@@ -561,7 +682,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                         href={getSafeExternalLink(item.metadata.channel_link)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-mono text-stone-600 hover:text-[#2D6A4F] mt-1.5 transition-colors"
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white mt-1 transition-colors"
                       >
                         <span>Visit Link</span>
                         <ExternalLink className="w-3 h-3" />
@@ -569,17 +690,16 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                     )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-stone-100 sm:border-t-0">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       <button
                         type="button"
                         disabled={!item._isDecrypted}
                         onClick={() => setPrivacyModalItem(item)}
-                        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors border rounded-xl shadow-xs ${
+                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
                           !item._isDecrypted
-                            ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed"
-                            : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200 cursor-pointer"
+                            ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
+                            : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
                         }`}
                         title={
                           !item._isDecrypted
@@ -595,10 +715,10 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                         type="button"
                         disabled={!item._isDecrypted}
                         onClick={() => setEditingItem(item)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border rounded-xl shadow-xs ${
+                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
                           !item._isDecrypted
-                            ? "bg-stone-50 text-stone-300 border-stone-200 cursor-not-allowed"
-                            : "bg-white hover:bg-stone-50 text-stone-700 border-stone-200 cursor-pointer"
+                            ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
+                            : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
                         }`}
                         title={
                           !item._isDecrypted
@@ -606,14 +726,14 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                             : "Edit recommendation details"
                         }
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-stone-400" />
+                        <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
                         <span>Edit</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setDeleteConfirmItem(item)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium transition-colors border border-rose-200 rounded-xl cursor-pointer"
+                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/20 rounded-xl cursor-pointer min-h-[40px]"
                         title="Delete recommendation permanently"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -628,154 +748,48 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         </div>
       )}
 
-      {/* TAB 3: UPVOTED ITEMS */}
-      {activeTab === "upvoted" && (
-        <div className="space-y-4">
-          {upvotedItems.length === 0 ? (
-          <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-            <Heart className="w-8 h-8 text-stone-400 mx-auto" />
-            <p className="font-display text-sm font-bold text-zinc-950">
-              No upvoted recommendations yet
-            </p>
-            <p className="text-xs text-stone-500 max-w-sm mx-auto">
-              Browse the community leaderboard and upvote things you love to
-              build this list.
-            </p>
-          </div>
-        ) : filteredUpvotedItems.length === 0 ? (
-          <div className="py-16 text-center bg-white border border-stone-200 rounded-2xl p-8 space-y-3 shadow-xs">
-            <Search className="w-8 h-8 text-stone-400 mx-auto" />
-            <p className="font-display text-sm font-bold text-zinc-950">
-              No upvoted recommendations found
-            </p>
-            <p className="text-xs text-stone-500 max-w-sm mx-auto">
-              No upvoted items matching "{searchQuery}".
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredUpvotedItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white hover:bg-white border border-stone-200/90 hover:border-stone-300 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-xs hover:shadow-md"
-              >
-                {/* Item Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold border ${getCategoryBadgeClass(item.category)}`}>
-                      {item.category === "other" &&
-                      item.metadata?.custom_category
-                        ? item.metadata.custom_category
-                        : CATEGORIES.find((c) => c.id === item.category)
-                            ?.label || item.category}
-                    </span>
-                    {item.metadata?.year && (
-                      <span className="text-xs font-mono text-stone-500">
-                        {item.metadata.year}
-                      </span>
-                    )}
-                    {item.metadata?.author && (
-                      <span className="text-xs text-stone-600 truncate">
-                        by {item.metadata.author}
-                      </span>
-                    )}
-                    {item.metadata?.platform && (
-                      <span className="text-xs text-stone-500">
-                        • {item.metadata.platform}
-                      </span>
-                    )}
-                  </div>
-
-                  <h3 className="font-display font-bold text-sm sm:text-base text-zinc-950 break-words line-clamp-2">
-                    {item.title}
-                  </h3>
-
-                  {item.metadata?.note && (
-                    <p className="text-xs text-stone-600 mt-1.5 line-clamp-2 leading-relaxed border-l-2 border-stone-200 pl-2.5 italic">
-                      "{item.metadata.note}"
-                    </p>
-                  )}
-
-                  {getSafeExternalLink(item.metadata?.channel_link) && (
-                    <a
-                      href={getSafeExternalLink(item.metadata.channel_link)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-mono text-stone-600 hover:text-[#2D6A4F] mt-1.5 transition-colors"
-                    >
-                      <span>Visit Link</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
-
-                {/* Vote Action */}
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-stone-100 sm:border-t-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleRecommend(item.id)}
-                    className="flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-rose-50 border border-emerald-200 hover:border-rose-200 text-emerald-700 hover:text-rose-700 text-xs font-mono rounded-xl transition-colors group cursor-pointer"
-                    title="Click to remove upvote"
-                  >
-                    <ArrowBigUp className="w-4 h-4 fill-emerald-600 stroke-emerald-600 group-hover:fill-rose-600 group-hover:stroke-rose-600" />
-                    <span className="font-bold">{item.recommend_count}</span>
-                    <span className="text-[11px] group-hover:hidden">
-                      Upvoted
-                    </span>
-                    <span className="text-[11px] hidden group-hover:inline">
-                      Remove
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )}
-
       {/* Privacy Toggle Confirmation Modal */}
       {privacyModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 border border-stone-200 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#141414] rounded-2xl max-w-md w-full p-6 space-y-4 border border-white/[0.12] shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.1] flex items-center justify-center shrink-0">
                 {privacyModalItem.is_private ? (
-                  <Globe className="w-5 h-5 text-emerald-700" />
+                  <Globe className="w-5 h-5 text-zinc-300" />
                 ) : (
-                  <Lock className="w-5 h-5 text-emerald-700" />
+                  <Lock className="w-5 h-5 text-zinc-300" />
                 )}
               </div>
               <div>
-                <h3 className="font-display font-bold text-base text-zinc-950">
+                <h3 className="font-display font-bold text-base text-white">
                   {privacyModalItem.is_private
                     ? "Make Recommendation Public?"
                     : "Move to Private Vault?"}
                 </h3>
-                <p className="text-xs text-stone-500 mt-0.5">
+                <p className="text-xs text-zinc-400 mt-0.5">
                   "{privacyModalItem.title}"
                 </p>
               </div>
             </div>
 
-            <p className="text-xs text-stone-600 leading-relaxed">
+            <p className="text-xs text-zinc-400 leading-relaxed">
               {privacyModalItem.is_private ? (
                 <>
                   This recommendation will be published to the{" "}
-                  <strong>global community leaderboard</strong> with your
+                  <strong className="text-white">community leaderboard</strong> with your
                   username as the creator.
                 </>
               ) : (
-                <>This recommendation will be removed from the public feed.</>
+                <>This recommendation will be removed from the public leaderboard and encrypted in your personal vault.</>
               )}
             </p>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-stone-100">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setPrivacyModalItem(null)}
                 disabled={isTogglingPrivacy}
-                className="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer min-h-[40px]"
               >
                 Cancel
               </button>
@@ -783,7 +797,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                 type="button"
                 onClick={handleTogglePrivacyConfirm}
                 disabled={isTogglingPrivacy}
-                className="px-4 py-2 text-xs font-semibold bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="px-5 py-2 text-xs font-semibold bg-white hover:bg-zinc-200 text-black rounded-full transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 min-h-[40px]"
               >
                 {isTogglingPrivacy && (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -809,28 +823,28 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-stone-200 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-700">
-              <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl">
-                <Trash2 className="w-5 h-5 text-rose-600" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                <Trash2 className="w-5 h-5 text-rose-400" />
               </div>
-              <h3 className="font-display font-bold text-base text-zinc-950">
+              <h3 className="font-display font-bold text-base text-white">
                 Delete Recommendation
               </h3>
             </div>
 
-            <p className="text-xs text-stone-600 leading-relaxed">
+            <p className="text-xs text-zinc-400 leading-relaxed">
               Are you sure you want to permanently delete{" "}
-              <strong>"{deleteConfirmItem.title}"</strong>? This will remove it
+              <strong className="text-white">"{deleteConfirmItem.title}"</strong>? This will remove it
               from the platform globally.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmItem(null)}
-                className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-zinc-950 hover:bg-stone-100 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer min-h-[40px]"
               >
                 Cancel
               </button>
@@ -838,11 +852,11 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                 type="button"
                 disabled={deletingId === deleteConfirmItem.id}
                 onClick={() => handleDelete(deleteConfirmItem.id)}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-full transition-colors disabled:opacity-50 cursor-pointer min-h-[40px]"
               >
                 {deletingId === deleteConfirmItem.id
                   ? "Deleting..."
-                  : "Yes, Delete Globally"}
+                  : "Delete Globally"}
               </button>
             </div>
           </div>

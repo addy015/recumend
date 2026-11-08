@@ -48,10 +48,10 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
   }
 
   return (
-    <div className="relative border-b border-stone-200 pb-2">
+    <div className="relative border-b border-white/[0.08] pb-3">
       {/* Left Scroll Button Overlay */}
       <div
-        className={`absolute left-0 top-0 bottom-2 flex items-center pr-8 pl-0.5 bg-gradient-to-r from-[#F7F6F2] via-[#F7F6F2]/90 to-transparent z-10 pointer-events-none transition-opacity duration-200 ${
+        className={`absolute left-0 top-0 bottom-3 flex items-center pr-8 pl-0.5 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/90 to-transparent z-10 pointer-events-none transition-opacity duration-200 ${
           canScrollLeft ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -61,7 +61,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
           disabled={!canScrollLeft}
           tabIndex={canScrollLeft ? 0 : -1}
           aria-label="Scroll categories left"
-          className="p-1.5 rounded-full bg-white hover:bg-stone-50 border border-stone-200 hover:border-stone-300 text-stone-700 shadow-xs pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          className="p-2 rounded-full bg-[#141414] hover:bg-[#202020] border border-white/[0.12] text-zinc-300 pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
           title="Scroll left"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -72,24 +72,25 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
       <nav
         ref={scrollRef}
         onScroll={checkScroll}
-        className="w-full flex items-center gap-1.5 overflow-x-auto no-scrollbar scrollbar-none touch-pan-x scroll-smooth py-0.5"
+        className="w-full flex items-center gap-2 overflow-x-auto no-scrollbar scrollbar-none touch-pan-x scroll-smooth py-1"
         aria-label="Filter categories"
       >
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon
           const isActive = selectedCategory === cat.id
+          const accentClass = cat.color || 'text-zinc-400'
           return (
             <button
               key={cat.id}
               type="button"
               onClick={() => onSelectCategory(cat.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all duration-150 shrink-0 select-none cursor-pointer rounded-full ${
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-mono transition-all duration-150 shrink-0 select-none cursor-pointer rounded-full min-h-[38px] ${
                 isActive
-                  ? 'bg-zinc-950 text-white font-semibold shadow-xs'
-                  : 'bg-white hover:bg-stone-100 text-stone-600 hover:text-zinc-900 border border-stone-200'
+                  ? 'bg-white text-black font-semibold shadow-sm'
+                  : 'bg-[#141414] hover:bg-[#1C1C1C] text-zinc-300 hover:text-white border border-white/[0.08] hover:border-white/20'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-stone-500'}`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-black' : accentClass}`} />
               <span>{cat.label}</span>
             </button>
           )
@@ -98,7 +99,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
 
       {/* Right Scroll Button Overlay */}
       <div
-        className={`absolute right-0 top-0 bottom-2 flex items-center pl-8 pr-0.5 bg-gradient-to-l from-[#F7F6F2] via-[#F7F6F2]/90 to-transparent z-10 pointer-events-none transition-opacity duration-200 ${
+        className={`absolute right-0 top-0 bottom-3 flex items-center pl-8 pr-0.5 bg-gradient-to-l from-[#0A0A0A] via-[#0A0A0A]/90 to-transparent z-10 pointer-events-none transition-opacity duration-200 ${
           canScrollRight ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -108,7 +109,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
           disabled={!canScrollRight}
           tabIndex={canScrollRight ? 0 : -1}
           aria-label="Scroll categories right"
-          className="p-1.5 rounded-full bg-white hover:bg-stone-50 border border-stone-200 hover:border-stone-300 text-stone-700 shadow-xs pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          className="p-2 rounded-full bg-[#141414] hover:bg-[#202020] border border-white/[0.12] text-zinc-300 pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
           title="Scroll right"
         >
           <ChevronRight className="w-3.5 h-3.5" />
