@@ -8,7 +8,7 @@ export const ATMOSPHERE_CONFIG = {
   // Enter a video or image file path (e.g. '/bg.mp4', '/bg.jpg', '/bg.webp' or a direct web URL).
   // Automatically detects whether it is a video (.mp4, .webm) or an image (.jpg, .png, .webp, .avif).
   // Leave empty ('') or null if you only want the Dusk Glow.
-  videoSrc: '/joker.jpg',
+  // videoSrc: '/joker.jpg',
 
   // Dark tint overlay placed directly over the video (range: 0.20 to 0.95).
   // Higher = darker video background so cards and text remain 100% readable.

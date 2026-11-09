@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ArrowBigUp, ExternalLink, Lock } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +9,7 @@ import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
 export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboard = false }) {
   const { userRecs, toggleRecommend } = useItems()
   const { user, signInWithGoogle } = useAuth()
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // The creator's upvote is permanently locked at +1
   const isOwner = Boolean(user?.id && item.created_by === user.id)
@@ -31,10 +32,15 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
     : categoryObj?.label || item.category
 
   const formattedRank = rank ? String(rank).padStart(2, '0') : null
+  const note = item.metadata?.note?.trim() || ''
+  const hasNote = Boolean(note)
+  const isLongNote = note.length > 95 || note.includes('\n')
 
   return (
     <article
-      className={`group rounded-2xl p-4 sm:p-5 flex items-start gap-4 transition-all duration-150 shadow-sm taste-card ${
+      className={`group rounded-2xl flex items-start gap-3.5 sm:gap-4 transition-all duration-150 shadow-sm taste-card ${
+        hasNote ? 'p-4 sm:p-5' : 'py-3 px-4 sm:py-3.5 sm:px-5'
+      } ${
         isLeaderboard && rank === 1
           ? 'bg-gradient-to-r from-rose-950/40 via-[#141414] to-[#121212] border border-rose-500/30 hover:border-rose-500/50'
           : isLeaderboard && rank === 2
@@ -63,7 +69,7 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
       )}
 
       {/* Main Content Column */}
-      <div className="flex-1 min-w-0 space-y-2">
+      <div className={`flex-1 min-w-0 ${hasNote ? 'space-y-2' : 'space-y-1 sm:space-y-1.5'}`}>
         {/* Minimal Metadata Strip */}
         <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 flex-wrap">
           <span
@@ -108,12 +114,26 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
         </h3>
 
         {/* Recommender Note & Username */}
-        {(item.metadata?.note || item.creator?.username) && (
-          <div className="pt-1 flex items-baseline justify-between gap-3 flex-wrap sm:flex-nowrap">
-            {item.metadata?.note ? (
-              <p className="border-l-2 border-amber-400/40 pl-2.5 text-xs text-zinc-300 italic leading-relaxed flex-1 line-clamp-2">
-                "{item.metadata.note}"
-              </p>
+        {(hasNote || item.creator?.username) && (
+          <div className={`${hasNote ? 'pt-1' : 'pt-0.5'} flex items-baseline justify-between gap-3 flex-wrap sm:flex-nowrap`}>
+            {hasNote ? (
+              <div className="flex-1 min-w-0">
+                <p className={`border-l-2 border-amber-400/40 pl-2.5 text-xs text-zinc-300 italic leading-relaxed break-words whitespace-pre-line ${isExpanded ? '' : 'line-clamp-2'}`}>
+                  "{note}"
+                </p>
+                {isLongNote && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsExpanded(prev => !prev)
+                    }}
+                    className="mt-1 pl-2.5 text-[11px] font-mono font-medium text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer inline-flex items-center not-italic select-none"
+                  >
+                    {isExpanded ? '... less' : '... more'}
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="flex-1" />
             )}
@@ -125,7 +145,9 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
                   e.stopPropagation()
                   onSelectUser?.(item.creator)
                 }}
-                className="shrink-0 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user self-end sm:self-auto min-h-[30px]"
+                className={`shrink-0 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user self-end sm:self-auto ${
+                  hasNote ? 'min-h-[26px]' : 'min-h-0 py-0'
+                }`}
                 title={`View @${item.creator.username}'s public profile`}
               >
                 <img
