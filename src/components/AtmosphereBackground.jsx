@@ -26,7 +26,7 @@ export default function AtmosphereBackground() {
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none overflow-hidden -z-10 bg-[#08090C]"
+      className="fixed top-0 left-0 w-full h-screen h-[100lvh] pointer-events-none overflow-hidden -z-10 bg-[#08090C]"
     >
       {/* ------------------------------------------------------------- */}
       {/* LAYER 1: Optional Cinematic Media (Video or Still Image)      */}

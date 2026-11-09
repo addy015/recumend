@@ -272,7 +272,7 @@ export default function Navbar({
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors min-h-[40px]"
                       >
                         <Bookmark className="w-4 h-4 text-zinc-400" />
-                        <span>My Vault</span>
+                        <span>My Recs.</span>
                       </button>
 
                       <button

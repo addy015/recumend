@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { X, Plus, Check, AlertCircle, Lock } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
@@ -14,6 +14,9 @@ export default function AddRecommendationModal({
 }) {
   const { items, addItem, toggleRecommend, userRecs, normalizeTitle } = useItems()
   const { user, signInWithGoogle } = useAuth()
+
+  // Ref to title input for auto-focus
+  const titleInputRef = useRef(null)
 
   // Form input fields
   const [title, setTitle] = useState('')
@@ -33,6 +36,11 @@ export default function AddRecommendationModal({
       if (initialCategory && initialCategory !== 'all') {
         setCategory(initialCategory)
       }
+      // Auto-focus title input when modal opens
+      const timer = setTimeout(() => {
+        titleInputRef.current?.focus()
+      }, 50)
+      return () => clearTimeout(timer)
     }
   }, [isOpen, initialPrivate, initialCategory])
 
@@ -253,10 +261,12 @@ export default function AddRecommendationModal({
                 Title / Name
               </label>
               <input
+                ref={titleInputRef}
                 id="add-rec-title"
                 name="title"
                 type="text"
                 required
+                autoFocus
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Severance, Interstellar, Atomic Habits..."

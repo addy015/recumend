@@ -255,7 +255,7 @@ function MainContent() {
                 }`}
               >
                 <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-black' : 'text-white'}`} />
-                <span>My Vault</span>
+                <span>My Recs</span>
                 {user && (
                   <span className={`px-2 py-0.5 text-[10px] font-mono rounded-full ${
                     activeTab === 'my-recs'

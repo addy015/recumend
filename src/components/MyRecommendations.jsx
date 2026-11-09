@@ -202,7 +202,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
           >
             <Plus className="w-4 h-4" />
-            <span>Add Title</span>
+            <span>Add Recs.</span>
           </button>
         </div>
       </div>

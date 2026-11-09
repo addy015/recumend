@@ -13,7 +13,7 @@ export const ATMOSPHERE_CONFIG = {
   // Dark tint overlay placed directly over the video (range: 0.20 to 0.95).
   // Higher = darker video background so cards and text remain 100% readable.
   // Default recommendation: 0.65 (65% darkness)
-  videoDarkTint: 0.8,
+  videoDarkTint: 0.85,
 
   // Soft blur applied to the video (e.g. '0px', '4px', '6px', '8px').
   // A blur between '4px' and '8px' turns moving video into smooth atmospheric depth.
