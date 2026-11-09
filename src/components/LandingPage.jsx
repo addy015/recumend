@@ -66,9 +66,9 @@ export default function LandingPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#EDEDED] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200">
+    <div className="flex-1 flex flex-col">
       {/* Top Header Bar */}
-      <header className="shrink-0 border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="shrink-0 border-b border-white/[0.08] bg-[#08090C]/60 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo with Ruby "REC" Dot */}
           <div
@@ -419,7 +419,7 @@ export default function LandingPage({
       </section>
 
       {/* Minimal Footer */}
-      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#0A0A0A] border-t border-white/[0.08]">
+      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#08090C]/40 backdrop-blur-md border-t border-white/[0.08]">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
             <span className="font-display font-bold text-white tracking-tight flex items-center">

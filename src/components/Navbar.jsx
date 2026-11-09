@@ -114,7 +114,7 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#0A0A0A]/90 backdrop-blur-md border-b border-white/[0.08]">
+      <header className="sticky top-0 z-30 bg-[#08090C]/60 backdrop-blur-md border-b border-white/[0.08]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
           {/* Brand */}
           <div

@@ -232,19 +232,23 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         </div>
       )}
 
-      {/* Sub-Tabs: Created, Upvoted, Private Vault */}
+      {/* Sub-Tabs */}
       <div className="flex border-b border-white/[0.08] gap-4 sm:gap-6 overflow-x-auto no-scrollbar">
         <button
           type="button"
           onClick={() => setActiveTab("created")}
-          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
+          className={`pb-3 text-xs flex items-center gap-2 border-b-2 transition-colors duration-75 cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "created"
               ? "border-white text-white font-bold"
-              : "border-transparent text-zinc-500 hover:text-white"
+              : "border-transparent text-white font-medium hover:opacity-80"
           }`}
         >
           <span>Created (Public)</span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300">
+          <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full ${
+            activeTab === "created"
+              ? "bg-white/20 text-white font-bold"
+              : "bg-white/10 text-white"
+          }`}>
             {createdCategory !== "all" || searchQuery?.trim()
               ? `${filteredCreatedItems.length}/${myItems.length}`
               : myItems.length}
@@ -254,15 +258,19 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         <button
           type="button"
           onClick={() => setActiveTab("upvoted")}
-          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
+          className={`pb-3 text-xs flex items-center gap-2 border-b-2 transition-colors duration-75 cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "upvoted"
               ? "border-white text-white font-bold"
-              : "border-transparent text-zinc-500 hover:text-white"
+              : "border-transparent text-white font-medium hover:opacity-80"
           }`}
         >
-          <Heart className={`w-3.5 h-3.5 ${activeTab === "upvoted" ? "text-rose-500 fill-rose-500" : "text-rose-400"}`} />
+          <Heart className={`w-3.5 h-3.5 ${activeTab === "upvoted" ? "text-rose-500 fill-rose-500" : "text-rose-400 fill-rose-400/20"}`} />
           <span>Upvoted</span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300">
+          <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full ${
+            activeTab === "upvoted"
+              ? "bg-white/20 text-white font-bold"
+              : "bg-white/10 text-white"
+          }`}>
             {upvotedCategory !== "all" || searchQuery?.trim()
               ? `${filteredUpvotedItems.length}/${upvotedItems.length}`
               : upvotedItems.length}
@@ -272,15 +280,19 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
         <button
           type="button"
           onClick={() => setActiveTab("private")}
-          className={`pb-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap min-h-[44px] ${
+          className={`pb-3 text-xs flex items-center gap-2 border-b-2 transition-colors duration-75 cursor-pointer whitespace-nowrap min-h-[44px] ${
             activeTab === "private"
               ? "border-white text-white font-bold"
-              : "border-transparent text-zinc-500 hover:text-white"
+              : "border-transparent text-white font-medium hover:opacity-80"
           }`}
         >
-          <Lock className="w-3.5 h-3.5" />
+          <Lock className="w-3.5 h-3.5 text-emerald-400" />
           <span>Private Vault</span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/[0.08] text-zinc-300 font-bold border border-white/[0.1]">
+          <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full border border-white/[0.1] ${
+            activeTab === "private"
+              ? "bg-white/20 text-white font-bold"
+              : "bg-white/10 text-white"
+          }`}>
             {vaultCategory !== "all" || searchQuery?.trim()
               ? `${filteredPrivateItems.length}/${myPrivateItems.length}`
               : myPrivateItems.length}
@@ -289,15 +301,14 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
       </div>
 
       {/* TAB 1: CREATED (PUBLIC) ITEMS */}
-      {activeTab === "created" && (
-        <div className="space-y-4">
-          <CategoryFilter
+      <div className={activeTab === "created" ? "space-y-4" : "hidden"}>
+        <CategoryFilter
             selectedCategory={createdCategory}
             onSelectCategory={setCreatedCategory}
           />
 
           {myItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
                 <Bookmark className="w-5 h-5" />
               </div>
@@ -324,7 +335,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               </button>
             </div>
           ) : filteredCreatedItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <Search className="w-6 h-6 text-zinc-600 mx-auto" />
               <p className="font-display text-sm font-semibold text-white">
                 No recommendations found
@@ -349,7 +360,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               {filteredCreatedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
+                  className="bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
                 >
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
@@ -440,18 +451,16 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             </div>
           )}
         </div>
-      )}
 
       {/* TAB 2: UPVOTED ITEMS */}
-      {activeTab === "upvoted" && (
-        <div className="space-y-4">
-          <CategoryFilter
+      <div className={activeTab === "upvoted" ? "space-y-4" : "hidden"}>
+        <CategoryFilter
             selectedCategory={upvotedCategory}
             onSelectCategory={setUpvotedCategory}
           />
 
           {upvotedItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <Heart className="w-8 h-8 text-rose-500/40 mx-auto" />
               <p className="font-display text-sm font-semibold text-white">
                 No upvoted recommendations yet
@@ -461,7 +470,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               </p>
             </div>
           ) : filteredUpvotedItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <Search className="w-6 h-6 text-zinc-600 mx-auto" />
               <p className="font-display text-sm font-semibold text-white">
                 No upvoted recommendations found
@@ -477,7 +486,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               {filteredUpvotedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
+                  className="bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
                 >
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
@@ -546,18 +555,16 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             </div>
           )}
         </div>
-      )}
 
       {/* TAB 3: PRIVATE E2EE VAULT ITEMS */}
-      {activeTab === "private" && (
-        <div className="space-y-4">
-          <CategoryFilter
+      <div className={activeTab === "private" ? "space-y-4" : "hidden"}>
+        <CategoryFilter
             selectedCategory={vaultCategory}
             onSelectCategory={setVaultCategory}
           />
 
           {myPrivateItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
                 <Lock className="w-5 h-5" />
               </div>
@@ -566,7 +573,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                   Your private vault is empty
                 </p>
                 <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-                  Store personal watchlists or confidential recommendations protected with client-side Web Crypto AES-GCM encryption.
+                  Save your guilty pleasures or private watchlist items here.
                 </p>
               </div>
               <button
@@ -584,7 +591,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               </button>
             </div>
           ) : filteredPrivateItems.length === 0 ? (
-            <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+            <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
               <Search className="w-6 h-6 text-zinc-600 mx-auto" />
               <p className="font-display text-sm font-semibold text-white">
                 No private recommendations found
@@ -629,7 +636,7 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
               {filteredPrivateItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-[#121212] hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
+                  className="bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
                 >
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
@@ -746,7 +753,6 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             </div>
           )}
         </div>
-      )}
 
       {/* Privacy Toggle Confirmation Modal */}
       {privacyModalItem && (

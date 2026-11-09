@@ -162,7 +162,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
       </div>
 
       {/* Profile Header Banner */}
-      <div className="bg-[#141414] border border-white/[0.08] rounded-2xl p-5 sm:p-6 space-y-4 sm:space-y-5">
+      <div className="bg-[#141414]/80 backdrop-blur-md border border-white/[0.08] rounded-2xl p-5 sm:p-6 space-y-4 sm:space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 sm:gap-4.5 min-w-0">
             <img
@@ -214,16 +214,17 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
         </div>
 
         {userItems.length === 0 ? (
-          <div className="p-12 text-center text-xs font-mono text-zinc-500 border border-white/[0.08] bg-[#141414] rounded-2xl">
+          <div className="p-12 text-center text-xs font-mono text-zinc-300 border border-white/[0.08] bg-[#141414]/92 rounded-2xl">
             No public recommendations created by @{profile.username} yet.
           </div>
         ) : (
           <div className="space-y-3">
-            {userItems.map((item, idx) => (
+            {userItems.map((item) => (
               <ItemCard
                 key={item.id}
                 item={item}
-                rank={idx + 1}
+                rank={null}
+                isLeaderboard={false}
                 onSelectUser={onSelectUser}
               />
             ))}

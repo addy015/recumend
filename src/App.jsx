@@ -9,6 +9,7 @@ import AddRecommendationModal from './components/AddRecommendationModal'
 import SettingsModal from './components/SettingsModal'
 import UserProfileView from './components/UserProfileView'
 import LegalView from './components/LegalView'
+import AtmosphereBackground from './components/AtmosphereBackground'
 import { TrendingUp, Bookmark, X } from 'lucide-react'
 
 // Lightweight SPA routing helper
@@ -119,7 +120,12 @@ function MainContent() {
         window.history.replaceState(null, '', window.location.pathname === '/landing' ? '/' : window.location.pathname)
       }
       const nextRoute = getRoute()
-      setRoute(nextRoute)
+      setRoute(prev => {
+        if (prev.page === nextRoute.page && prev.username === nextRoute.username) {
+          return prev
+        }
+        return nextRoute
+      })
       if (window.location.hash === '#/my-recs') {
         setActiveTab('my-recs')
       } else if (nextRoute.page === 'feed' && !window.location.hash) {
@@ -146,10 +152,13 @@ function MainContent() {
     setIsAddModalOpen(true)
   }
 
-  // ROUTE 1: HOMEPAGE (/) -> Landing Page
-  if (route.page === 'landing') {
-    return (
-      <>
+  // AtmosphereBackground stays permanently mounted across ALL routes
+  return (
+    <div className="min-h-screen text-[#F3F4F6] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200 relative">
+      {/* Lives across all routes without remounting */}
+      <AtmosphereBackground />
+
+      {route.page === 'landing' ? (
         <LandingPage
           onBegin={() => navigate('/feed')}
           onExploreFeed={() => navigate('/feed')}
@@ -166,44 +175,34 @@ function MainContent() {
           onOpenMyRecs={() => navigate('/feed#/my-recs')}
           isAuthenticating={isAuthenticating}
         />
-        <SettingsModal
-          key={profile?.id ? `${profile.id}-${profile.username}` : 'settings-modal'}
-          isOpen={isSettingsModalOpen}
-          onClose={() => setIsSettingsModalOpen(false)}
-        />
-      </>
-    )
-  }
-
-  // ROUTE 2 & 3: /feed or /u/:username -> Community Dashboard
-  return (
-    <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200">
-      {/* Main Navbar */}
-      <Navbar
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        activeTab={activeTab}
-        setActiveTab={(tab) => {
-          if (tab === 'my-recs') {
-            navigate('/feed#/my-recs')
-          } else {
-            navigate('/feed')
-          }
-          setActiveTab(tab)
-        }}
-        onGoToHome={() => navigate('/')}
-        onOpenProfileModal={() => {
-          if (profile?.username) {
-            navigate(`/u/${profile.username}`)
-          }
-        }}
-        onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
-        onSelectUser={(u) => {
-          if (u?.username) {
-            navigate(`/u/${u.username}`)
-          }
-        }}
-      />
+      ) : (
+        <>
+          {/* Main Navbar */}
+          <Navbar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            activeTab={activeTab}
+            setActiveTab={(tab) => {
+              if (tab === 'my-recs') {
+                navigate('/feed#/my-recs')
+              } else {
+                navigate('/feed')
+              }
+              setActiveTab(tab)
+            }}
+            onGoToHome={() => navigate('/')}
+            onOpenProfileModal={() => {
+              if (profile?.username) {
+                navigate(`/u/${profile.username}`)
+              }
+            }}
+            onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+            onSelectUser={(u) => {
+              if (u?.username) {
+                navigate(`/u/${u.username}`)
+              }
+            }}
+          />
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
@@ -229,13 +228,13 @@ function MainContent() {
                   navigate('/feed')
                   setActiveTab('feed')
                 }}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[38px] ${
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-colors duration-75 cursor-pointer min-h-[38px] ${
                   activeTab === 'feed'
-                    ? 'bg-white text-black'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-white text-black font-bold shadow-sm'
+                    : 'bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60'
                 }`}
               >
-                <TrendingUp className="w-4 h-4" />
+                <TrendingUp className={`w-4 h-4 ${activeTab === 'feed' ? 'text-black' : 'text-white'}`} />
                 <span>Leaderboard</span>
               </button>
 
@@ -249,19 +248,19 @@ function MainContent() {
                   navigate('/feed#/my-recs')
                   setActiveTab('my-recs')
                 }}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[38px] ${
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-colors duration-75 cursor-pointer min-h-[38px] ${
                   activeTab === 'my-recs'
-                    ? 'bg-white text-black'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                    ? 'bg-white text-black font-bold shadow-sm'
+                    : 'bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60'
                 }`}
               >
-                <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-black' : 'text-zinc-400'}`} />
+                <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-black' : 'text-white'}`} />
                 <span>My Vault</span>
                 {user && (
                   <span className={`px-2 py-0.5 text-[10px] font-mono rounded-full ${
                     activeTab === 'my-recs'
                       ? 'bg-black/10 text-black font-bold'
-                      : 'bg-white/[0.08] text-zinc-300'
+                      : 'bg-white/15 text-white font-mono'
                   }`}>
                     {myItems.length + (upvotedItems?.length || 0)}
                   </span>
@@ -270,9 +269,7 @@ function MainContent() {
             </div>
 
             {/* Tab Views */}
-            {activeTab === 'my-recs' ? (
-              <MyRecommendations onOpenAddModal={handleOpenAddModal} searchQuery={searchQuery} />
-            ) : (
+            <div className={activeTab === 'feed' ? 'block' : 'hidden'}>
               <CommunityFeed
                 searchQuery={searchQuery}
                 sortBy={feedSortBy}
@@ -284,13 +281,17 @@ function MainContent() {
                   }
                 }}
               />
-            )}
+            </div>
+
+            <div className={activeTab === 'my-recs' ? 'block' : 'hidden'}>
+              <MyRecommendations onOpenAddModal={handleOpenAddModal} searchQuery={searchQuery} />
+            </div>
           </>
         )}
       </main>
 
       {/* Minimal Footer */}
-      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#0A0A0A] border-t border-white/[0.08] mt-auto">
+      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#08090C]/40 backdrop-blur-md border-t border-white/[0.08] mt-auto">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
             <button
@@ -315,6 +316,8 @@ function MainContent() {
           </div>
         </div>
       </footer>
+        </>
+      )}
 
       {/* Modals */}
       <AddRecommendationModal

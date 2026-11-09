@@ -75,18 +75,18 @@ export default function CommunityFeed({
       {/* Sub-Header: Dual Sort Control and Count Indicator */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Segmented Pill Switcher */}
-        <div className="inline-flex items-center p-1 bg-[#141414] border border-white/[0.08] rounded-full">
+        <div className="inline-flex items-center p-1 bg-[#141414]/80 backdrop-blur-md border border-white/[0.08] rounded-full">
           <button
             type="button"
             onClick={() => onSortChange?.("overall")}
             className={`flex items-center gap-2 px-4 py-1.5 text-xs font-mono rounded-full transition-all cursor-pointer min-h-[34px] ${
               sortBy === "overall"
                 ? "bg-white text-black font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-white"
+                : "text-white hover:bg-white/[0.08]"
             }`}
             title="Ranked strictly by recommendations"
           >
-            <Trophy className={`w-3.5 h-3.5 ${sortBy === "overall" ? "text-amber-500 fill-amber-500" : "text-amber-400/80"}`} />
+            <Trophy className={`w-3.5 h-3.5 ${sortBy === "overall" ? "text-amber-500 fill-amber-500" : "text-amber-400"}`} />
             <span>Leaderboard</span>
           </button>
           <button
@@ -95,11 +95,11 @@ export default function CommunityFeed({
             className={`flex items-center gap-2 px-4 py-1.5 text-xs font-mono rounded-full transition-all cursor-pointer min-h-[34px] ${
               sortBy === "recent"
                 ? "bg-white text-black font-semibold shadow-sm"
-                : "text-zinc-400 hover:text-white"
+                : "text-white hover:bg-white/[0.08]"
             }`}
             title="Ranked strictly by newest submissions"
           >
-            <Clock className={`w-3.5 h-3.5 ${sortBy === "recent" ? "text-sky-500" : "text-sky-400/80"}`} />
+            <Clock className={`w-3.5 h-3.5 ${sortBy === "recent" ? "text-sky-500" : "text-sky-400"}`} />
             <span>Recent</span>
           </button>
         </div>
@@ -129,7 +129,7 @@ export default function CommunityFeed({
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="py-20 text-center bg-[#121212] border border-white/[0.08] rounded-2xl p-8 space-y-4">
+          <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
             <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
               <Search className="w-5 h-5" />
             </div>
@@ -157,7 +157,8 @@ export default function CommunityFeed({
             <ItemCard
               key={item.id}
               item={item}
-              rank={idx + 1}
+              rank={sortBy === "overall" ? idx + 1 : null}
+              isLeaderboard={sortBy === "overall"}
               onSelectUser={onSelectUser}
             />
           ))

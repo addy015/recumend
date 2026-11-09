@@ -79,8 +79,8 @@ export default function ProfileModal({ profileData, isOpen, onClose }) {
               No recommendations created yet.
             </div>
           ) : (
-            userItems.map((item, idx) => (
-              <ItemCard key={item.id} item={item} rank={idx + 1} />
+            userItems.map((item) => (
+              <ItemCard key={item.id} item={item} rank={null} isLeaderboard={false} />
             ))
           )}
         </div>

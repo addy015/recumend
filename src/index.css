@@ -13,6 +13,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Global brand text selection (Rose-red / velvet amber theme) */
+  ::selection {
+    background-color: rgba(225, 29, 72, 0.35); /* rose-600 with 35% opacity */
+    color: #fecdd3; /* soft rose-200 text highlight */
+  }
+
   /* Minimal cinema scrollbar */
   ::-webkit-scrollbar {
     width: 5px;
@@ -56,4 +62,28 @@
 
 .btn-press:active {
   transform: scale(0.98);
+}
+
+@keyframes duskBreath {
+  0%, 100% {
+    opacity: 0.7;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate3d(-10px, 12px, 0) scale(1.06);
+  }
+}
+
+.animate-dusk {
+  animation: duskBreath 8s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dusk {
+    animation: none;
+  }
 }

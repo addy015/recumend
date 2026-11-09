@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { CATEGORIES, getCategoryBadgeClass } from '../constants/categories'
 import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
 
-// Individual recommendation card showing rank, title, creator, and upvote button
-export default function ItemCard({ item, rank, onSelectUser }) {
+// Individual recommendation card showing rank (in leaderboard), title, creator, and upvote button
+export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboard = false }) {
   const { userRecs, toggleRecommend } = useItems()
   const { user, signInWithGoogle } = useAuth()
 
@@ -30,36 +30,37 @@ export default function ItemCard({ item, rank, onSelectUser }) {
     ? item.metadata.custom_category
     : categoryObj?.label || item.category
 
-  const formattedRank = String(rank).padStart(2, '0')
+  const formattedRank = rank ? String(rank).padStart(2, '0') : null
 
   return (
     <article
       className={`group rounded-2xl p-4 sm:p-5 flex items-start gap-4 transition-all duration-150 shadow-sm taste-card ${
-        rank === 1
-          ? 'bg-gradient-to-r from-rose-950/20 via-[#141414] to-[#121212] border border-rose-500/30 hover:border-rose-500/50'
-          : rank === 2
-          ? 'bg-gradient-to-r from-slate-900/30 via-[#131416] to-[#121212] border border-slate-400/25 hover:border-slate-300/40'
-          : rank === 3
-          ? 'bg-gradient-to-r from-amber-950/15 via-[#141312] to-[#121212] border border-amber-700/25 hover:border-amber-600/35'
-          : 'bg-[#121212] hover:bg-[#161616] border border-white/[0.08] hover:border-white/[0.18]'
+        isLeaderboard && rank === 1
+          ? 'bg-gradient-to-r from-rose-950/40 via-[#141414] to-[#121212] border border-rose-500/30 hover:border-rose-500/50'
+          : isLeaderboard && rank === 2
+          ? 'bg-gradient-to-r from-slate-900/50 via-[#131416] to-[#121212] border border-slate-400/25 hover:border-slate-300/40'
+          : isLeaderboard && rank === 3
+          ? 'bg-gradient-to-r from-amber-950/35 via-[#141312] to-[#121212] border border-amber-700/25 hover:border-amber-600/35'
+          : 'bg-[#121212]/92 hover:bg-[#161616] border border-white/[0.08] hover:border-white/[0.18]'
       }`}
     >
-      {/* Editorial Typographic Rank */}
-      <div className="shrink-0 pt-0.5 select-none w-6 sm:w-7 text-right">
-        <span
-          className={`font-mono text-xs sm:text-sm tabular-nums tracking-tighter ${
-            rank === 1
-              ? 'text-amber-400 font-black drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]'
-              : rank === 2
-              ? 'text-slate-200 font-extrabold'
-              : rank === 3
-              ? 'text-amber-600 font-bold'
-              : 'text-zinc-600 font-medium group-hover:text-zinc-400'
-          }`}
-        >
-          {formattedRank}
-        </span>
-      </div>
+      {formattedRank && (
+        <div className="shrink-0 pt-0.5 select-none w-6 sm:w-7 text-right">
+          <span
+            className={`font-mono text-xs sm:text-sm tabular-nums tracking-tighter ${
+              isLeaderboard && rank === 1
+                ? 'text-amber-400 font-black drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+                : isLeaderboard && rank === 2
+                ? 'text-slate-200 font-extrabold'
+                : isLeaderboard && rank === 3
+                ? 'text-amber-600 font-bold'
+                : 'text-zinc-600 font-medium group-hover:text-zinc-400'
+            }`}
+          >
+            {formattedRank}
+          </span>
+        </div>
+      )}
 
       {/* Main Content Column */}
       <div className="flex-1 min-w-0 space-y-2">
