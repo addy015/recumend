@@ -126,7 +126,7 @@ export function ItemProvider({ children }) {
     return () => {
       isMounted = false
     }
-  }, [user?.id, providerToken, savePublicKeyToProfile])
+  }, [user, providerToken, savePublicKeyToProfile])
 
   // Helper to decrypt a single private item
   const decryptSingleItem = async (item, key, fallbackKeys = []) => {
@@ -377,7 +377,7 @@ export function ItemProvider({ children }) {
     } catch (err) {
       console.warn('Failed to refresh private items:', err)
     }
-  }, [user?.id])
+  }, [user])
 
   // Realtime subscription for live item changes across tabs or Supabase channels
   useEffect(() => {
@@ -639,9 +639,10 @@ export function ItemProvider({ children }) {
   }
 
   // Add a new recommendation with deduplication checks (supports public and private E2EE items)
-  async function addItem({ title, category, metadata = {}, is_private = false }) {
+  async function addItem({ title, category, metadata = {}, is_private = false, isPrivate = false }) {
     if (!user) return { error: 'Must be logged in' }
 
+    const targetIsPrivate = Boolean(is_private || isPrivate)
     const cleanTitle = title ? title.trim() : ''
     if (!cleanTitle || cleanTitle.length > 200) {
       return { error: 'Title must be between 1 and 200 characters' }
@@ -660,17 +661,17 @@ export function ItemProvider({ children }) {
     if (!norm) return { error: 'Invalid title characters' }
 
     // If public item, check if it already exists in the same category
-    if (!is_private) {
+    if (!targetIsPrivate) {
       const existing = items.find(
         it => !it.is_private && it.normalized_title === norm && it.category === category
       )
       if (existing) {
-        return { exists: true, item: existing }
+        return { exists: true, duplicate: true, item: existing, existingItem: existing }
       }
     }
 
     // Handle Private E2EE Vault Item
-    if (is_private) {
+    if (targetIsPrivate) {
       if (!vaultKeys?.vaultKey) {
         return { error: 'Encryption vault is still syncing with Google Drive. Please wait a few seconds and try again.' }
       }
@@ -829,7 +830,7 @@ export function ItemProvider({ children }) {
       if (err.code === '23505' || err.message?.includes('unique_item_category') || err.message?.includes('duplicate key')) {
         const existingItem = items.find(it => it.normalized_title === norm && it.category === category)
         if (existingItem) {
-          return { exists: true, item: existingItem }
+          return { exists: true, duplicate: true, item: existingItem, existingItem: existingItem }
         }
         msg = `"${cleanTitle}" has already been recommended in this category.`
       } else if (err.message?.includes('Rate limit')) {

@@ -3,6 +3,7 @@ import {
   Bookmark,
   Search,
   User,
+  Users,
   LogOut,
   Settings,
   ArrowRight,
@@ -11,8 +12,10 @@ import {
   X
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useFriends } from "../context/FriendContext";
 import { supabase } from "../lib/supabase";
 import { getAvatarUrl } from "../lib/avatar";
+import { KNOWN_USERS } from "../constants/knownUsers";
 
 // Top navigation bar containing site logo, live search, and account controls
 export default function Navbar({
@@ -21,6 +24,7 @@ export default function Navbar({
   setActiveTab,
   onOpenProfileModal,
   onOpenSettingsModal,
+  onOpenFriendsModal,
   onSelectUser,
   onGoToHome,
 }) {
@@ -34,6 +38,7 @@ export default function Navbar({
     clearAuthError,
     isSupabaseConfigured,
   } = useAuth();
+  const { friends = [], incomingRequests = [] } = useFriends() || {};
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [matchingUsers, setMatchingUsers] = useState([]);
@@ -59,6 +64,18 @@ export default function Navbar({
             .limit(5);
           if (!error && isMounted) {
             setMatchingUsers(data || []);
+          }
+        } else {
+          const demoCurators = Object.values(KNOWN_USERS || {});
+          const matched = demoCurators
+            .filter(
+              (u) =>
+                u.username?.toLowerCase().includes(q.toLowerCase()) ||
+                u.display_name?.toLowerCase().includes(q.toLowerCase())
+            )
+            .slice(0, 5);
+          if (isMounted) {
+            setMatchingUsers(matched);
           }
         }
       } catch (err) {
@@ -232,7 +249,27 @@ export default function Navbar({
           {/* Action Buttons & Auth */}
           <div className="flex items-center gap-2 shrink-0">
             {user && profile ? (
-              <div className="relative" ref={dropdownRef}>
+              <>
+                <button
+                  type="button"
+                  onClick={onOpenFriendsModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141414] hover:bg-white/[0.08] border border-white/[0.1] rounded-full text-zinc-300 hover:text-white transition-all cursor-pointer min-h-[40px] text-xs font-mono"
+                  title="Friends & Connections"
+                >
+                  <Users className="w-3.5 h-3.5 text-zinc-300" />
+                  <span className="hidden sm:inline">Friends</span>
+                  {incomingRequests.length > 0 ? (
+                    <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-400 text-black" title={`${incomingRequests.length} incoming friend request(s)`}>
+                      {incomingRequests.length}
+                    </span>
+                  ) : friends.length > 0 ? (
+                    <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-white/10 text-white">
+                      {friends.length}
+                    </span>
+                  ) : null}
+                </button>
+
+                <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -262,6 +299,18 @@ export default function Navbar({
                           @{profile.username}
                         </p>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          onOpenFriendsModal?.();
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors min-h-[40px]"
+                      >
+                        <Users className="w-4 h-4 text-zinc-400" />
+                        <span>Friends ({friends.length})</span>
+                      </button>
 
                       <button
                         type="button"
@@ -315,6 +364,7 @@ export default function Navbar({
                     </div>
                 )}
               </div>
+            </>
             ) : (
               <button
                 type="button"

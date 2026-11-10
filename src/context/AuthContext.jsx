@@ -435,6 +435,28 @@ export function AuthProvider({ children }) {
     }
   }, [profile])
 
+  // Save both public key and encrypted private key to profile
+  const saveP2PKeysToProfile = useCallback(async ({ public_key, encrypted_private_key }) => {
+    if (!profile?.id) return
+    if (!isSupabaseConfigured) {
+      setProfile(prev => prev ? { ...prev, public_key, encrypted_private_key } : null)
+      return
+    }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ public_key, encrypted_private_key })
+        .eq('id', profile.id)
+      if (error) {
+        console.warn('Failed to save P2P keys to profile:', error.message)
+      } else {
+        setProfile(prev => prev ? { ...prev, public_key, encrypted_private_key } : null)
+      }
+    } catch (err) {
+      console.warn('saveP2PKeysToProfile exception:', err)
+    }
+  }, [profile])
+
   // Update profile details (username, display name)
   async function updateProfile({ username, display_name }) {
     if (!profile) return { error: 'Not authenticated' }
@@ -484,6 +506,7 @@ export function AuthProvider({ children }) {
       profile,
       providerToken,
       savePublicKeyToProfile,
+      saveP2PKeysToProfile,
       loading,
       isAuthenticating,
       authError,

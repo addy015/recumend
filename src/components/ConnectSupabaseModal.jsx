@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X, Database, Check, Copy, ExternalLink, ShieldCheck, AlertCircle, Key, Globe } from 'lucide-react'
 import {
   supabaseUrl,
@@ -74,6 +74,17 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
   const [anonKey, setAnonKey] = useState(supabaseAnonKey || '')
   const [copied, setCopied] = useState(false)
   const [errorMsg, setErrorMsg] = useState(null)
+  const backdropMouseDownRef = useRef(false)
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -111,8 +122,22 @@ export default function ConnectSupabaseModal({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/40 backdrop-blur-xs animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose()
+        }
+        backdropMouseDownRef.current = false
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-start justify-between pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2.5">

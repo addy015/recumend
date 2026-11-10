@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { ArrowBigUp, ExternalLink, Lock } from 'lucide-react'
+import { ArrowBigUp, ExternalLink, Lock, Share2 } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
 import { CATEGORIES, getCategoryBadgeClass } from '../constants/categories'
 import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
 
 // Individual recommendation card showing rank (in leaderboard), title, creator, and upvote button
-export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboard = false }) {
+export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboard = false, onOpenShare }) {
   const { userRecs, toggleRecommend } = useItems()
   const { user, signInWithGoogle } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
@@ -185,7 +185,26 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
 
       {/* Action Buttons Container */}
       <div className="flex items-center gap-2 shrink-0 self-center">
-        {/* Tactile Inversion / Golden Accent Upvote Button */}
+        {/* Share Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!user) {
+              signInWithGoogle()
+              return
+            }
+            onOpenShare?.(item)
+          }}
+          className="flex flex-col items-center justify-center min-w-[2.5rem] w-10 sm:w-11 py-2 px-1 border border-white/[0.1] bg-[#151515] hover:bg-white/[0.08] text-zinc-400 hover:text-white rounded-xl transition-all duration-150 cursor-pointer active:scale-95 min-h-[46px]"
+          title="Share recommendation with friends"
+          aria-label="Share recommendation"
+        >
+          <Share2 className="w-4 h-4" />
+          <span className="text-[10px] font-mono mt-0.5 text-zinc-400">Share</span>
+        </button>
+
+        {/* Upvote Button */}
         <button
           type="button"
           onClick={handleVote}

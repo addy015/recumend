@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Bookmark,
   Edit3,
@@ -11,7 +11,9 @@ import {
   Lock,
   Globe,
   Loader2,
-  Search
+  Search,
+  Share2,
+  MoreVertical
 } from "lucide-react";
 import { useItems } from "../context/ItemContext";
 import { CATEGORIES, getCategoryBadgeClass } from "../constants/categories";
@@ -20,7 +22,7 @@ import CategoryFilter from "./CategoryFilter";
 import EditRecommendationModal from "./EditRecommendationModal";
 
 // User dashboard for managing personal created recommendations, private vault items, and endorsements
-export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) {
+export default function MyRecommendations({ onOpenAddModal, searchQuery = "", onOpenShare }) {
   const {
     myItems,
     myPrivateItems = [],
@@ -43,6 +45,40 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
   const [privacyModalItem, setPrivacyModalItem] = useState(null);
   const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+  const backdropMouseDownRef = useRef(false);
+
+  // Close modals on Escape key
+  useEffect(() => {
+    if (!privacyModalItem && !deleteConfirmItem) return;
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        if (!isTogglingPrivacy) setPrivacyModalItem(null);
+        if (!deletingId) setDeleteConfirmItem(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [privacyModalItem, deleteConfirmItem, isTogglingPrivacy, deletingId]);
+
+  // Close 3-dots card menu on click outside or Escape
+  useEffect(() => {
+    if (!activeMenuId) return;
+    function handleClickOutside(e) {
+      if (!e.target.closest("[data-card-menu]")) {
+        setActiveMenuId(null);
+      }
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setActiveMenuId(null);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
 
   // Auto-fetch private items if vault is empty on tab switch (avoids needing full page reload)
   useEffect(() => {
@@ -357,11 +393,15 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredCreatedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
-                >
+              {filteredCreatedItems.map((item) => {
+                const isMenuActive = activeMenuId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card ${
+                      isMenuActive ? "relative z-30" : "relative z-0"
+                    }`}
+                  >
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
                       <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-md font-medium border ${getCategoryBadgeClass(item.category)}`}>
@@ -415,39 +455,76 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                     </div>
 
                     <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* Share Button */}
                       <button
                         type="button"
-                        onClick={() => setPrivacyModalItem(item)}
+                        onClick={() => onOpenShare?.(item)}
                         className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
-                        title="Move to Private Vault (E2EE)"
+                        title="Share with friends"
                       >
-                        <Lock className="w-3.5 h-3.5 text-zinc-400" />
-                        <span className="hidden sm:inline">Make Private</span>
+                        <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="hidden sm:inline">Share</span>
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setEditingItem(item)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
-                        title="Edit recommendation details"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>Edit</span>
-                      </button>
+                      {/* 3-Dots Dropdown Menu */}
+                      <div className={`relative ${isMenuActive ? "z-40" : ""}`} data-card-menu>
+                        <button
+                          type="button"
+                          onClick={() => setActiveMenuId(isMenuActive ? null : item.id)}
+                          className="p-2.5 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px] flex items-center justify-center transition-colors"
+                          title="More options"
+                          aria-label="More options"
+                        >
+                          <MoreVertical className="w-4 h-4 text-zinc-400" />
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirmItem(item)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/20 rounded-xl cursor-pointer min-h-[40px]"
-                        title="Delete recommendation globally"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
+                        {isMenuActive && (
+                          <div className="absolute right-0 mt-1.5 w-44 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                setEditingItem(item);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <Edit3 className="w-4 h-4 text-zinc-400" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                setPrivacyModalItem(item);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <Lock className="w-4 h-4 text-zinc-400" />
+                              <span>Make Private</span>
+                            </button>
+
+                            <div className="border-t border-white/[0.08] pt-1 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setDeleteConfirmItem(item);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>
@@ -534,6 +611,16 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
                   </div>
 
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
+                    <button
+                      type="button"
+                      onClick={() => onOpenShare?.(item)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
+                      title="Share recommendation with friends"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => toggleRecommend(item.id)}
@@ -633,11 +720,15 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredPrivateItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card"
-                >
+              {filteredPrivateItems.map((item) => {
+                const isMenuActive = activeMenuId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-[#121212]/92 hover:bg-[#171717] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-150 taste-card ${
+                      isMenuActive ? "relative z-30" : "relative z-0"
+                    }`}
+                  >
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-mono text-zinc-500">
                       <span className={`text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-md font-medium border ${getCategoryBadgeClass(item.category)}`}>
@@ -699,65 +790,112 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
 
                   <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
                     <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* Share Button */}
                       <button
                         type="button"
-                        disabled={!item._isDecrypted}
-                        onClick={() => setPrivacyModalItem(item)}
+                        disabled={!(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))}
+                        onClick={() => onOpenShare?.(item)}
                         className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
-                          !item._isDecrypted
+                          !(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))
                             ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
                             : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
                         }`}
                         title={
-                          !item._isDecrypted
-                            ? "Cannot make public until decrypted"
-                            : "Publish this item to the community leaderboard"
+                          !(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))
+                            ? "Cannot share until decrypted"
+                            : "Share privately with a friend (E2EE)"
                         }
                       >
-                        <Globe className="w-3.5 h-3.5" />
-                        <span>Make Public</span>
+                        <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="hidden sm:inline">Share</span>
                       </button>
 
-                      <button
-                        type="button"
-                        disabled={!item._isDecrypted}
-                        onClick={() => setEditingItem(item)}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
-                          !item._isDecrypted
-                            ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
-                            : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
-                        }`}
-                        title={
-                          !item._isDecrypted
-                            ? "Cannot edit until decrypted"
-                            : "Edit recommendation details"
-                        }
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>Edit</span>
-                      </button>
+                      {/* 3-Dots Dropdown Menu */}
+                      <div className={`relative ${isMenuActive ? "z-40" : ""}`} data-card-menu>
+                        <button
+                          type="button"
+                          disabled={!(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))}
+                          onClick={() => setActiveMenuId(isMenuActive ? null : item.id)}
+                          className={`p-2.5 border rounded-xl min-h-[40px] flex items-center justify-center transition-colors ${
+                            !(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))
+                              ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
+                              : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
+                          }`}
+                          title="More options"
+                          aria-label="More options"
+                        >
+                          <MoreVertical className="w-4 h-4 text-zinc-400" />
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirmItem(item)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium transition-colors border border-rose-500/20 rounded-xl cursor-pointer min-h-[40px]"
-                        title="Delete recommendation permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
+                        {isMenuActive && (
+                          <div className="absolute right-0 mt-1.5 w-44 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                setEditingItem(item);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <Edit3 className="w-4 h-4 text-zinc-400" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                setPrivacyModalItem(item);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <Globe className="w-4 h-4 text-zinc-400" />
+                              <span>Make Public</span>
+                            </button>
+
+                            <div className="border-t border-white/[0.08] pt-1 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  setDeleteConfirmItem(item);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
           )}
         </div>
 
       {/* Privacy Toggle Confirmation Modal */}
       {privacyModalItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#141414] rounded-2xl max-w-md w-full p-6 space-y-4 border border-white/[0.12] shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            backdropMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && backdropMouseDownRef.current && !isTogglingPrivacy) {
+              setPrivacyModalItem(null);
+            }
+            backdropMouseDownRef.current = false;
+          }}
+        >
+          <div
+            className="bg-[#141414] rounded-2xl max-w-md w-full p-6 space-y-4 border border-white/[0.12] shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.1] flex items-center justify-center shrink-0">
                 {privacyModalItem.is_private ? (
@@ -829,8 +967,22 @@ export default function MyRecommendations({ onOpenAddModal, searchQuery = "" }) 
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+          onMouseDown={(e) => {
+            backdropMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && backdropMouseDownRef.current && !deletingId) {
+              setDeleteConfirmItem(null);
+            }
+            backdropMouseDownRef.current = false;
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 text-rose-400">
               <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                 <Trash2 className="w-5 h-5 text-rose-400" />

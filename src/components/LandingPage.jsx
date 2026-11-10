@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   ArrowRight,
-  CheckCircle2,
   Loader2,
   Bookmark,
   User,
+  Users,
+  Send,
   Settings,
   LogOut,
   TrendingUp,
@@ -14,7 +15,7 @@ import { getAvatarUrl } from "../lib/avatar";
 
 export default function LandingPage({
   onBegin,
-  onExploreFeed,
+  onExploreFeed: _onExploreFeed,
   user,
   profile,
   onGoogleSignIn,
@@ -22,6 +23,8 @@ export default function LandingPage({
   onOpenSettingsModal,
   onOpenProfileModal,
   onOpenMyRecs,
+  onOpenFriendsModal,
+  onOpenShared,
   isAuthenticating,
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -149,6 +152,30 @@ export default function LandingPage({
                       type="button"
                       onClick={() => {
                         setDropdownOpen(false);
+                        onOpenShared?.();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[40px]"
+                    >
+                      <Send className="w-4 h-4 text-zinc-400" />
+                      <span>Shared w/ Me</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        onOpenFriendsModal?.();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[40px]"
+                    >
+                      <Users className="w-4 h-4 text-zinc-400" />
+                      <span>Friends</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDropdownOpen(false);
                         onOpenProfileModal?.();
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[40px]"
@@ -187,7 +214,7 @@ export default function LandingPage({
               </div>
             ) : user ? (
               <div className="flex items-center gap-2 p-1.5 border border-white/[0.1] rounded-full">
-                <div className="w-7 h-7 rounded-full bg-zinc-800 animate-pulse" />
+                <div className="w-7 h-7 rounded-full bg-zinc-800" />
               </div>
             ) : (
               <button

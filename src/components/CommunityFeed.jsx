@@ -6,11 +6,12 @@ import ItemCard from "./ItemCard";
 
 // Global community leaderboard feed showing top recommended items
 export default function CommunityFeed({
-  searchQuery,
+  searchQuery = "",
   sortBy = "overall",
   onSortChange,
   onOpenAddModal,
   onSelectUser,
+  onOpenShare,
 }) {
   const { items, loading: itemsLoading } = useItems();
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -25,11 +26,12 @@ export default function CommunityFeed({
     }
 
     // Filter by search query across title, category, metadata, and creator
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
+    const cleanQuery = (searchQuery || "").trim();
+    if (cleanQuery) {
+      const q = cleanQuery.toLowerCase();
       result = result.filter((item) => {
-        const matchTitle = item.title.toLowerCase().includes(q);
-        const matchCategory = item.category.toLowerCase().includes(q);
+        const matchTitle = (item.title || "").toLowerCase().includes(q);
+        const matchCategory = (item.category || "").toLowerCase().includes(q);
         const matchCustomCat = item.metadata?.custom_category?.toLowerCase().includes(q);
         const matchNote = item.metadata?.note?.toLowerCase().includes(q);
         const matchAuthor = item.metadata?.author?.toLowerCase().includes(q);
@@ -160,6 +162,7 @@ export default function CommunityFeed({
               rank={sortBy === "overall" ? idx + 1 : null}
               isLeaderboard={sortBy === "overall"}
               onSelectUser={onSelectUser}
+              onOpenShare={onOpenShare}
             />
           ))
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { X, Plus, Check, AlertCircle, Lock } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
@@ -17,6 +17,7 @@ export default function AddRecommendationModal({
 
   // Ref to title input for auto-focus
   const titleInputRef = useRef(null)
+  const backdropMouseDownRef = useRef(false)
 
   // Form input fields
   const [title, setTitle] = useState('')
@@ -28,24 +29,31 @@ export default function AddRecommendationModal({
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [duplicateCandidate, setDuplicateCandidate] = useState(null)
+  const [prevOpen, setPrevOpen] = useState(isOpen)
 
-  // Sync isPrivate and initialCategory when modal opens or initial values change
-  useEffect(() => {
+  // Adjust state during render when modal opens
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen)
     if (isOpen) {
       setIsPrivate(Boolean(initialPrivate))
       if (initialCategory && initialCategory !== 'all') {
         setCategory(initialCategory)
       }
-      // Auto-focus title input when modal opens
+    }
+  }
+
+  // Auto-focus title input when modal opens
+  useEffect(() => {
+    if (isOpen) {
       const timer = setTimeout(() => {
         titleInputRef.current?.focus()
       }, 50)
       return () => clearTimeout(timer)
     }
-  }, [isOpen, initialPrivate, initialCategory])
+  }, [isOpen])
 
   // Clear inputs and error messages
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setTitle('')
     setCategory(initialCategory && initialCategory !== 'all' ? initialCategory : 'movie')
     setCustomCategory('')
@@ -55,12 +63,22 @@ export default function AddRecommendationModal({
     setStatus(null)
     setIsSubmitting(false)
     setDuplicateCandidate(null)
-  }
+  }, [initialCategory, initialPrivate])
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetForm()
     onClose()
-  }
+  }, [resetForm, onClose])
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, handleClose])
 
   // Find matching items in real time while user is typing
   const matchingExistingItems = useMemo(() => {
@@ -115,13 +133,14 @@ export default function AddRecommendationModal({
       title: title.trim(),
       category,
       metadata,
+      is_private: isPrivate,
       isPrivate
     })
 
     setIsSubmitting(false)
 
-    if (res?.duplicate) {
-      setDuplicateCandidate(res.existingItem)
+    if (res?.duplicate || res?.exists) {
+      setDuplicateCandidate(res.existingItem || res.item)
       return
     }
 
@@ -170,8 +189,22 @@ export default function AddRecommendationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 text-white">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          handleClose()
+        }
+        backdropMouseDownRef.current = false
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
           <div>

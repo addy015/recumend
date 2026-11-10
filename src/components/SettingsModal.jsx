@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
@@ -10,6 +10,28 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [username, setUsername] = useState(profile?.username || '')
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [prevOpen, setPrevOpen] = useState(isOpen)
+  const backdropMouseDownRef = useRef(false)
+
+  // Sync inputs with profile data when modal opens
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen)
+    if (isOpen) {
+      setDisplayName(profile?.display_name || '')
+      setUsername(profile?.username || '')
+      setStatus(null)
+    }
+  }
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen || !profile) return null
 
@@ -37,8 +59,22 @@ export default function SettingsModal({ isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-white">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose()
+        }
+        backdropMouseDownRef.current = false
+      }}
+    >
+      <div
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
           <div>

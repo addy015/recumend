@@ -273,3 +273,89 @@ export async function deriveSharedKey(myPrivateKey, theirPublicKeyJwk) {
     ['encrypt', 'decrypt']
   )
 }
+
+// ----------------------------------------------------------------------------
+// Step 7: Encrypt & Decrypt for a Specific Friend (Peer-to-Peer E2EE)
+// ----------------------------------------------------------------------------
+export async function encryptForFriend(data, friendPublicKeyJwk, myPrivateKey) {
+  if (!friendPublicKeyJwk || !myPrivateKey) {
+    throw new Error('Missing friend public key or user private key')
+  }
+  const sharedKey = await deriveSharedKey(myPrivateKey, friendPublicKeyJwk)
+  return await encryptData(data, sharedKey)
+}
+
+export async function decryptFromFriend(ciphertext, iv, friendPublicKeyJwk, myPrivateKey) {
+  if (!friendPublicKeyJwk || !myPrivateKey) {
+    throw new Error('Missing friend public key or user private key')
+  }
+  const sharedKey = await deriveSharedKey(myPrivateKey, friendPublicKeyJwk)
+  return await decryptData(ciphertext, iv, sharedKey)
+}
+
+// ----------------------------------------------------------------------------
+// Step 8: Ensure User's Active P2P ECDH Keys are Initialized & Synchronized
+// Restores existing private key by decrypting with deterministic vaultKey,
+// or generates fresh keypair and saves encrypted_private_key to Supabase.
+// ----------------------------------------------------------------------------
+export async function ensureUserP2PKeys({ vaultKey, profile, saveKeysToProfile }) {
+  if (!vaultKey) return null
+  const crypto = getCrypto()
+
+  // 1. If profile already has public_key and encrypted_private_key, restore it
+  if (profile?.public_key && profile?.encrypted_private_key) {
+    try {
+      const parsed = typeof profile.encrypted_private_key === 'string'
+        ? JSON.parse(profile.encrypted_private_key)
+        : profile.encrypted_private_key
+
+      const decryptedJwk = await decryptData(parsed.ciphertext, parsed.iv, vaultKey)
+      const privateKey = await crypto.subtle.importKey(
+        'jwk',
+        decryptedJwk,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveKey', 'deriveBits']
+      )
+
+      return {
+        publicKeyJwkString: typeof profile.public_key === 'string' ? profile.public_key : JSON.stringify(profile.public_key),
+        privateKey
+      }
+    } catch (err) {
+      console.warn('Failed to restore existing P2P keypair from profile, will regenerate:', err)
+    }
+  }
+
+  // 2. Generate new ECDH P-256 keypair
+  const keyPair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveKey', 'deriveBits']
+  )
+
+  const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey)
+  const privateJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey)
+  const publicKeyJwkString = JSON.stringify(publicJwk)
+
+  // Encrypt privateKey using user's personal deterministic vaultKey
+  const encryptedPriv = await encryptData(privateJwk, vaultKey)
+  const encryptedPrivateKeyString = JSON.stringify(encryptedPriv)
+
+  // Save to profile via callback if available
+  if (typeof saveKeysToProfile === 'function') {
+    try {
+      await saveKeysToProfile({
+        public_key: publicKeyJwkString,
+        encrypted_private_key: encryptedPrivateKeyString
+      })
+    } catch (saveErr) {
+      console.error('Failed to save P2P keys to profile:', saveErr)
+    }
+  }
+
+  return {
+    publicKeyJwkString,
+    privateKey: keyPair.privateKey
+  }
+}

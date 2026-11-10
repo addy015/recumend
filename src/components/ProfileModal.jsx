@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { X, Award, Calendar } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { getAvatarUrl } from '../lib/avatar'
@@ -7,15 +7,43 @@ import ItemCard from './ItemCard'
 // Pop-up modal displaying a user's profile details and recommendations
 export default function ProfileModal({ profileData, isOpen, onClose }) {
   const { items } = useItems()
+  const backdropMouseDownRef = useRef(false)
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen || !profileData) return null
 
-  // Filter recommendations created by this specific user
-  const userItems = items.filter(it => it.created_by === profileData.id || it.creator?.username === profileData.username)
+  // Filter public recommendations created by this specific user
+  const userItems = items.filter(it => !it.is_private && (
+    it.created_by === profileData.id ||
+    (it.creator?.username && profileData.username && it.creator.username.toLowerCase() === profileData.username.toLowerCase())
+  ))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-xl max-h-[85vh] bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl flex flex-col space-y-4 text-white">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose()
+        }
+        backdropMouseDownRef.current = false
+      }}
+    >
+      <div
+        className="w-full max-w-xl max-h-[85vh] bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl flex flex-col space-y-4 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] shrink-0">
           <div className="flex items-center gap-3">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X, Save } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { CATEGORIES } from '../constants/categories'
@@ -25,14 +25,39 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
   const [note, setNote] = useState(item?.metadata?.note || '')
   const [status, setStatus] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const backdropMouseDownRef = useRef(false)
+
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen || !item) return null
 
   // Prevent editing locked/undecrypted items
   if (item.is_private && !item._isDecrypted && item.title === '[Encrypted Item]') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
-        <div className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4 text-white">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+        onMouseDown={(e) => {
+          backdropMouseDownRef.current = e.target === e.currentTarget
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+            onClose()
+          }
+          backdropMouseDownRef.current = false
+        }}
+      >
+        <div
+          className="w-full max-w-md bg-[#141414] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4 text-white"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
             <h2 className="font-display text-base font-bold text-white">Item Locked</h2>
             <button type="button" onClick={onClose} className="p-1.5 text-zinc-400 hover:text-white rounded-lg">
@@ -119,8 +144,22 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-white">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+      onMouseDown={(e) => {
+        backdropMouseDownRef.current = e.target === e.currentTarget
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDownRef.current) {
+          onClose()
+        }
+        backdropMouseDownRef.current = false
+      }}
+    >
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#141414] border border-white/[0.12] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08]">
           <div>

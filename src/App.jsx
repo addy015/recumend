@@ -1,16 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { ItemProvider, useItems } from './context/ItemContext'
+import { ItemProvider } from './context/ItemContext'
+import { FriendProvider, useFriends } from './context/FriendContext'
 import Navbar from './components/Navbar'
 import LandingPage from './components/LandingPage'
 import CommunityFeed from './components/CommunityFeed'
 import MyRecommendations from './components/MyRecommendations'
+import SharedWithMe from './components/SharedWithMe'
 import AddRecommendationModal from './components/AddRecommendationModal'
 import SettingsModal from './components/SettingsModal'
+import FriendsModal from './components/FriendsModal'
+import ShareRecommendationModal from './components/ShareRecommendationModal'
 import UserProfileView from './components/UserProfileView'
 import LegalView from './components/LegalView'
 import AtmosphereBackground from './components/AtmosphereBackground'
-import { TrendingUp, Bookmark, X } from 'lucide-react'
+import { TrendingUp, Bookmark, Send, X } from 'lucide-react'
 
 // Lightweight SPA routing helper
 function navigate(url) {
@@ -38,16 +42,16 @@ function getRoute() {
     return { page: 'privacy', username: null }
   }
 
-  // 2. Profile route: /u/:username or #/u/:username
-  const pathUser = path.match(/^\/u\/([a-zA-Z0-9_]+)/)
-  const hashUser = hash.match(/^#\/u\/([a-zA-Z0-9_]+)/)
+  // 2. Profile route: /u/:username or #/u/:username (with optional @, dots, or dashes)
+  const pathUser = path.match(/^\/u\/@?([a-zA-Z0-9_.-]+)/)
+  const hashUser = hash.match(/^#\/u\/@?([a-zA-Z0-9_.-]+)/)
   const username = pathUser?.[1] || hashUser?.[1] || null
   if (username) {
     return { page: 'profile', username }
   }
 
-  // 3. Community Feed route: /feed or #/feed or #/app or #/my-recs
-  if (path === '/feed' || hash === '#/feed' || hash === '#/app' || hash === '#/my-recs') {
+  // 3. Community Feed route: /feed or #/feed or #/app or #/my-recs or #/shared
+  if (path === '/feed' || hash === '#/feed' || hash === '#/app' || hash === '#/my-recs' || hash === '#/shared' || hash === '#shared') {
     return { page: 'feed', username: null }
   }
 
@@ -56,16 +60,21 @@ function getRoute() {
 }
 
 function MainContent() {
-  const { myItems, upvotedItems = [] } = useItems()
   const { user, profile, signInWithGoogle, signOut, isAuthenticating } = useAuth()
+  const { unreadCount = 0 } = useFriends() || {}
 
   // Track active route derived from URL (path / hash)
   const [route, setRoute] = useState(getRoute)
 
   // Navigation and search state within the app dashboard
   const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#/my-recs') {
-      return 'my-recs'
+    if (typeof window !== 'undefined') {
+      if (window.location.hash === '#/shared' || window.location.hash === '#shared') {
+        return 'shared'
+      }
+      if (window.location.hash === '#/my-recs' || window.location.hash === '#my-recs') {
+        return 'my-recs'
+      }
     }
     return 'feed'
   })
@@ -83,11 +92,15 @@ function MainContent() {
     }, 5000)
   }, [])
 
-  // Handle successful recommendation addition
-  const handleAddSuccess = useCallback(({ isPrivate }) => {
+  // Handle successful recommendation addition or upvote
+  const handleAddSuccess = useCallback(({ isPrivate, isUpvote, item }) => {
     if (isPrivate) {
       showToast({
         message: 'Saved to your private vault.'
+      })
+    } else if (isUpvote) {
+      showToast({
+        message: item?.title ? `Added your recommendation for "${item.title}" (+1)!` : 'Recommendation endorsed (+1)!'
       })
     } else {
       showToast({
@@ -126,8 +139,10 @@ function MainContent() {
         }
         return nextRoute
       })
-      if (window.location.hash === '#/my-recs') {
+      if (window.location.hash === '#/my-recs' || window.location.hash === '#my-recs') {
         setActiveTab('my-recs')
+      } else if (window.location.hash === '#/shared' || window.location.hash === '#shared') {
+        setActiveTab('shared')
       } else if (nextRoute.page === 'feed' && !window.location.hash) {
         setActiveTab('feed')
       }
@@ -152,6 +167,20 @@ function MainContent() {
     setIsAddModalOpen(true)
   }
 
+  // Open share modal or prompt Google login if guest
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [sharingItem, setSharingItem] = useState(null)
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false)
+
+  const handleOpenShare = useCallback((item) => {
+    if (!user) {
+      signInWithGoogle()
+      return
+    }
+    setSharingItem(item)
+    setIsShareModalOpen(true)
+  }, [user, signInWithGoogle])
+
   // AtmosphereBackground stays permanently mounted across ALL routes
   return (
     <div className="min-h-screen text-[#F3F4F6] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200 relative">
@@ -173,6 +202,20 @@ function MainContent() {
             }
           }}
           onOpenMyRecs={() => navigate('/feed#/my-recs')}
+          onOpenFriendsModal={() => {
+            if (!user) {
+              signInWithGoogle()
+              return
+            }
+            setIsFriendsModalOpen(true)
+          }}
+          onOpenShared={() => {
+            if (!user) {
+              signInWithGoogle()
+              return
+            }
+            navigate('/feed#/shared')
+          }}
           isAuthenticating={isAuthenticating}
         />
       ) : (
@@ -185,6 +228,8 @@ function MainContent() {
             setActiveTab={(tab) => {
               if (tab === 'my-recs') {
                 navigate('/feed#/my-recs')
+              } else if (tab === 'shared') {
+                navigate('/feed#/shared')
               } else {
                 navigate('/feed')
               }
@@ -197,6 +242,13 @@ function MainContent() {
               }
             }}
             onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
+            onOpenFriendsModal={() => {
+              if (!user) {
+                signInWithGoogle()
+                return
+              }
+              setIsFriendsModalOpen(true)
+            }}
             onSelectUser={(u) => {
               if (u?.username) {
                 navigate(`/u/${u.username}`)
@@ -217,6 +269,8 @@ function MainContent() {
                 navigate(`/u/${u.username}`)
               }
             }}
+            onOpenShare={handleOpenShare}
+            onToast={showToast}
           />
         ) : (
           <>
@@ -256,13 +310,29 @@ function MainContent() {
               >
                 <Bookmark className={`w-4 h-4 ${activeTab === 'my-recs' ? 'text-black' : 'text-white'}`} />
                 <span>My Recs</span>
-                {user && (
-                  <span className={`px-2 py-0.5 text-[10px] font-mono rounded-full ${
-                    activeTab === 'my-recs'
-                      ? 'bg-black/10 text-black font-bold'
-                      : 'bg-white/15 text-white font-mono'
-                  }`}>
-                    {myItems.length + (upvotedItems?.length || 0)}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!user) {
+                    signInWithGoogle()
+                    return
+                  }
+                  navigate('/feed#/shared')
+                  setActiveTab('shared')
+                }}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-colors duration-75 cursor-pointer min-h-[38px] ${
+                  activeTab === 'shared'
+                    ? 'bg-white text-black font-bold shadow-sm'
+                    : 'bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60'
+                }`}
+              >
+                <Send className={`w-4 h-4 ${activeTab === 'shared' ? 'text-black' : 'text-white'}`} />
+                <span>Shared</span>
+                {user && unreadCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full bg-amber-400 text-black">
+                    {unreadCount}
                   </span>
                 )}
               </button>
@@ -275,6 +345,7 @@ function MainContent() {
                 sortBy={feedSortBy}
                 onSortChange={setFeedSortBy}
                 onOpenAddModal={handleOpenAddModal}
+                onOpenShare={handleOpenShare}
                 onSelectUser={(creator) => {
                   if (creator?.username) {
                     navigate(`/u/${creator.username}`)
@@ -284,7 +355,24 @@ function MainContent() {
             </div>
 
             <div className={activeTab === 'my-recs' ? 'block' : 'hidden'}>
-              <MyRecommendations onOpenAddModal={handleOpenAddModal} searchQuery={searchQuery} />
+              <MyRecommendations
+                onOpenAddModal={handleOpenAddModal}
+                searchQuery={searchQuery}
+                onOpenShare={handleOpenShare}
+              />
+            </div>
+
+            <div className={activeTab === 'shared' ? 'block' : 'hidden'}>
+              <SharedWithMe
+                isActive={activeTab === 'shared'}
+                searchQuery={searchQuery}
+                onToast={showToast}
+                onSelectUser={(creator) => {
+                  if (creator?.username) {
+                    navigate(`/u/${creator.username}`)
+                  }
+                }}
+              />
             </div>
           </>
         )}
@@ -334,6 +422,28 @@ function MainContent() {
         onClose={() => setIsSettingsModalOpen(false)}
       />
 
+      <ShareRecommendationModal
+        isOpen={isShareModalOpen}
+        item={sharingItem}
+        onClose={() => {
+          setIsShareModalOpen(false)
+          setSharingItem(null)
+        }}
+        onShareSuccess={({ count, itemTitle, isPrivate }) => {
+          showToast({
+            message: isPrivate
+              ? `E2EE: Shared "${itemTitle}" securely with ${count} friend${count === 1 ? '' : 's'}!`
+              : `Shared "${itemTitle}" with ${count} friend${count === 1 ? '' : 's'}!`
+          })
+        }}
+      />
+
+      <FriendsModal
+        isOpen={isFriendsModalOpen}
+        onClose={() => setIsFriendsModalOpen(false)}
+        onToast={showToast}
+      />
+
       {/* Floating Toast Notification Banner */}
       {toast && (
         <div
@@ -373,7 +483,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ItemProvider>
-        <MainContent />
+        <FriendProvider>
+          <MainContent />
+        </FriendProvider>
       </ItemProvider>
     </AuthProvider>
   )

@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Share2, Award, Check } from 'lucide-react'
+import { ArrowLeft, Share2, Award, Check, UserPlus, UserCheck, Loader2, Clock } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import { useItems } from '../context/ItemContext'
+import { useFriends } from '../context/FriendContext'
 import { getAvatarUrl } from '../lib/avatar'
+import { KNOWN_USERS } from '../constants/knownUsers'
 import ItemCard from './ItemCard'
 
 // Public user profile page showing curated recommendations for /u/:username
-export default function UserProfileView({ username, onBack, onSelectUser }) {
+export default function UserProfileView({ username, onBack, onSelectUser, onOpenShare, onToast }) {
+  const { user, signInWithGoogle } = useAuth()
   const { items } = useItems()
+  const {
+    friends = [],
+    incomingRequests = [],
+    outgoingRequests = [],
+    sendFriendRequest,
+    acceptFriendRequest,
+    cancelFriendRequest,
+    addFriend
+  } = useFriends() || {}
+
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [isAddingFriend, setIsAddingFriend] = useState(false)
 
   const itemsRef = React.useRef(items)
   useEffect(() => {
     itemsRef.current = items
   }, [items])
+
+  // Clean username handle (strip leading @)
+  const cleanUsername = String(username || '').replace(/^@/, '').trim()
 
   // Fetch target user's profile information
   useEffect(() => {
@@ -27,17 +45,27 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
       try {
         if (!isSupabaseConfigured) {
           // Demo fallback: search in items
-          const found = itemsRef.current.find(it => it.creator?.username === username)
+          const found = itemsRef.current.find(
+            it => it.creator?.username?.toLowerCase() === cleanUsername.toLowerCase()
+          )
           if (found?.creator) {
             setProfile(found.creator)
           } else {
-            setProfile({
-              id: 'demo-user',
-              username: username,
-              display_name: username.toUpperCase(),
-              app_uid: `u_${username.slice(0, 6)}`,
-              avatar_url: null
-            })
+            const known = Object.values(KNOWN_USERS || {}).find(
+              u => u.username?.toLowerCase() === cleanUsername.toLowerCase()
+            )
+            if (known) {
+              setProfile({ ...known, public_key: null })
+            } else {
+              setProfile({
+                id: 'demo-user',
+                username: cleanUsername,
+                display_name: cleanUsername.toUpperCase(),
+                app_uid: `u_${cleanUsername.slice(0, 6)}`,
+                avatar_url: null,
+                public_key: null
+              })
+            }
           }
           setLoading(false)
           return
@@ -46,13 +74,13 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
         // Fetch from Supabase
         const { data, error: err } = await supabase
           .from('profiles')
-          .select('id, app_uid, username, display_name, avatar_url, created_at')
-          .eq('username', username)
+          .select('id, app_uid, username, display_name, avatar_url, public_key, created_at')
+          .eq('username', cleanUsername)
           .maybeSingle()
 
         if (err) throw err
         if (!data) {
-          setError(`User @${username} not found`)
+          setError(`User @${cleanUsername} not found`)
         } else {
           setProfile(data)
         }
@@ -64,22 +92,92 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
       }
     }
 
-    if (username) {
+    if (cleanUsername) {
       loadUserProfile()
     }
-  }, [username])
+  }, [cleanUsername])
 
-  // Get all items created by or attributed to this user
+  // Get all public items created by or attributed to this user (strictly excluding private vault items)
   const userItems = items.filter(it => {
-    if (!profile) return false
-    return it.created_by === profile.id || it.creator?.username === profile.username
+    if (!profile || it.is_private) return false
+    return it.created_by === profile.id || it.creator?.username?.toLowerCase() === profile.username?.toLowerCase()
   })
 
+  const isOwnProfile = Boolean(user?.id && profile?.id && user.id === profile.id)
+  const isFriend = Boolean(profile?.id && friends.some((f) => f.id === profile.id))
+  const incomingReq = incomingRequests.find((r) => r.id === profile?.id)
+  const outgoingReq = outgoingRequests.find((r) => r.id === profile?.id)
+
+  const handleSendFriendRequest = async () => {
+    if (!user) {
+      signInWithGoogle()
+      return
+    }
+    if (!profile?.id) return
+
+    setIsAddingFriend(true)
+    try {
+      const res = await (sendFriendRequest || addFriend)(profile)
+      if (res?.error) {
+        onToast?.({ message: res.error })
+      } else {
+        onToast?.({ message: `Friend request sent to @${profile.username}!` })
+      }
+    } catch (err) {
+      onToast?.({ message: err.message || 'Failed to send friend request' })
+    } finally {
+      setIsAddingFriend(false)
+    }
+  }
+
+  const handleAcceptRequest = async () => {
+    if (!incomingReq) return
+    const reqId = incomingReq.requestId || incomingReq.id
+    setIsAddingFriend(true)
+    try {
+      const res = await acceptFriendRequest(reqId)
+      if (res?.error) {
+        onToast?.({ message: res.error })
+      } else {
+        onToast?.({ message: `Connected with @${profile.username}!` })
+      }
+    } catch (err) {
+      onToast?.({ message: err.message || 'Failed to accept friend request' })
+    } finally {
+      setIsAddingFriend(false)
+    }
+  }
+
+  const handleCancelRequest = async () => {
+    if (!outgoingReq) return
+    const reqId = outgoingReq.requestId || outgoingReq.id
+    setIsAddingFriend(true)
+    try {
+      const res = await cancelFriendRequest(reqId)
+      if (res?.error) {
+        onToast?.({ message: res.error })
+      } else {
+        onToast?.({ message: `Cancelled request to @${profile.username}` })
+      }
+    } catch (err) {
+      onToast?.({ message: err.message || 'Failed to cancel friend request' })
+    } finally {
+      setIsAddingFriend(false)
+    }
+  }
+
   // Copy current profile URL to clipboard
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleShare = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback
+      setCopied(false)
+    }
   }
 
   if (loading) {
@@ -88,13 +186,13 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-xs font-mono text-stone-400 hover:text-white transition-colors cursor-pointer min-h-[40px]"
+          className="flex items-center gap-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer min-h-[40px]"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Feed</span>
         </button>
-        <div className="p-12 text-center text-xs font-mono text-stone-400 border border-white/[0.08] bg-[#11141D] rounded-2xl shadow-card">
-          Loading @{username}'s profile...
+        <div className="p-12 text-center text-xs font-mono text-zinc-400 border border-white/[0.08] bg-[#141414] rounded-2xl shadow-sm">
+          Loading @{cleanUsername || username}'s profile...
         </div>
       </div>
     )
@@ -132,7 +230,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
   return (
     <div className="space-y-6">
       {/* Navigation bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -142,23 +240,80 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
           <span>Back to Feed</span>
         </button>
 
-        <button
-          type="button"
-          onClick={handleShare}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] rounded-full text-xs font-mono text-zinc-200 transition-colors cursor-pointer min-h-[40px]"
-        >
-          {copied ? (
-            <>
-              <Check className="w-3.5 h-3.5 text-white" />
-              <span className="text-white">Link Copied!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Share Profile</span>
-            </>
+        <div className="flex items-center gap-2">
+          {!isOwnProfile && (
+            isFriend ? (
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 text-xs font-mono font-semibold min-h-[40px]">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Friends</span>
+              </span>
+            ) : incomingReq ? (
+              <button
+                type="button"
+                disabled={isAddingFriend}
+                onClick={handleAcceptRequest}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full text-xs font-semibold font-body transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50"
+                title={`Accept friend request from @${profile.username}`}
+              >
+                {isAddingFriend ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                ) : (
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                )}
+                <span>Accept Request</span>
+              </button>
+            ) : outgoingReq ? (
+              <button
+                type="button"
+                disabled={isAddingFriend}
+                onClick={handleCancelRequest}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/10 hover:bg-rose-500/20 text-zinc-300 hover:text-rose-300 border border-white/10 rounded-full text-xs font-mono transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50 group/req"
+                title="Click to cancel friend request"
+              >
+                {isAddingFriend ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                )}
+                <span className="group-hover/req:hidden">Request Sent</span>
+                <span className="hidden group-hover/req:inline text-rose-300">Cancel Request</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isAddingFriend}
+                onClick={handleSendFriendRequest}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-zinc-200 text-black rounded-full text-xs font-semibold font-body transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50"
+                title={`Add @${profile.username} as friend`}
+              >
+                {isAddingFriend ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                ) : (
+                  <UserPlus className="w-3.5 h-3.5" />
+                )}
+                <span>{isAddingFriend ? "Sending..." : "Add Friend"}</span>
+              </button>
+            )
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] rounded-full text-xs font-mono text-zinc-200 transition-colors cursor-pointer min-h-[40px]"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-white" />
+                <span className="text-white">Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Share Profile</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Profile Header Banner */}
@@ -226,6 +381,7 @@ export default function UserProfileView({ username, onBack, onSelectUser }) {
                 rank={null}
                 isLeaderboard={false}
                 onSelectUser={onSelectUser}
+                onOpenShare={onOpenShare}
               />
             ))}
           </div>
