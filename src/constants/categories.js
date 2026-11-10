@@ -4,7 +4,7 @@ import { Film, Tv, PlaySquare, BookOpen, Gamepad2, Video, Clapperboard, Layers, 
 export const CATEGORIES = [
   { id: 'all', label: 'All', icon: Layers, color: 'text-zinc-300', bg: 'bg-white/[0.06]' },
   { id: 'movie', label: 'Movies', icon: Film, color: 'text-amber-400', bg: 'bg-amber-400/10' },
-  { id: 'show', label: 'TV Shows', icon: Tv, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+  { id: 'show', label: 'TV Shows/Series', icon: Tv, color: 'text-orange-400', bg: 'bg-orange-400/10' },
   { id: 'anime', label: 'Anime', icon: PlaySquare, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
   { id: 'book', label: 'Books', icon: BookOpen, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
   { id: 'game', label: 'Games', icon: Gamepad2, color: 'text-rose-400', bg: 'bg-rose-400/10' },

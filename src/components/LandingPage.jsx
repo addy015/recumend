@@ -358,7 +358,7 @@ export default function LandingPage({
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 flex-wrap">
                       <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md border bg-orange-500/10 text-orange-300 border-orange-500/25">
-                        TV Shows
+                        TV Shows/Series
                       </span>
                       <span>2022</span>
                       <span>• Apple TV+</span>
