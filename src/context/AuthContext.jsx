@@ -35,6 +35,8 @@ function getInitialAuthError() {
   return null
 }
 
+const CACHED_PROFILE_KEY = 'recumend_cached_profile'
+
 // Retrieves mock user data from localStorage for offline demo preview
 function getInitialMockState() {
   if (typeof window === 'undefined') return { user: null, profile: null }
@@ -50,9 +52,36 @@ function getInitialMockState() {
   return { user: null, profile: null }
 }
 
+function getInitialCachedUser() {
+  if (!isSupabaseConfigured) return getInitialMockState().user
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(CACHED_PROFILE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed?.id) return { id: parsed.id, email: parsed.email }
+      }
+    } catch {}
+  }
+  return null
+}
+
+function getInitialCachedProfile() {
+  if (!isSupabaseConfigured) return getInitialMockState().profile
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(CACHED_PROFILE_KEY)
+      if (raw) {
+        return JSON.parse(raw)
+      }
+    } catch {}
+  }
+  return null
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => (!isSupabaseConfigured ? getInitialMockState().user : null))
-  const [profile, setProfile] = useState(() => (!isSupabaseConfigured ? getInitialMockState().profile : null))
+  const [user, setUser] = useState(getInitialCachedUser)
+  const [profile, setProfile] = useState(getInitialCachedProfile)
   const [providerToken, setProviderToken] = useState(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -115,15 +144,30 @@ export function AuthProvider({ children }) {
 
             const finalProfile = updated || { ...data, avatar_url: googleAvatar }
             setProfile(finalProfile)
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(finalProfile))
+              } catch {}
+            }
             return finalProfile
           } catch (syncErr) {
             console.warn('Avatar sync to DB failed:', syncErr)
             const fallbackProfile = { ...data, avatar_url: googleAvatar }
             setProfile(fallbackProfile)
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(fallbackProfile))
+              } catch {}
+            }
             return fallbackProfile
           }
         } else {
           setProfile(data)
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(data))
+            } catch {}
+          }
           return data
         }
       } else {
@@ -153,6 +197,11 @@ export function AuthProvider({ children }) {
 
         const finalProfile = created || newProfile
         setProfile(finalProfile)
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(finalProfile))
+          } catch {}
+        }
         return finalProfile
       }
     } catch (err) {
@@ -228,6 +277,7 @@ export function AuthProvider({ children }) {
         if (typeof window !== 'undefined') {
           try {
             localStorage.removeItem('recumend_google_provider_token')
+            localStorage.removeItem(CACHED_PROFILE_KEY)
           } catch {}
         }
         setIsAuthenticating(false)
@@ -400,6 +450,7 @@ export function AuthProvider({ children }) {
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('recumend_google_provider_token')
+        localStorage.removeItem(CACHED_PROFILE_KEY)
       } catch {}
     }
     if (!isSupabaseConfigured) {
@@ -497,6 +548,11 @@ export function AuthProvider({ children }) {
     }
 
     setProfile(data)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(data))
+      } catch {}
+    }
     return { success: true }
   }
 

@@ -16,7 +16,7 @@ import { useFriends } from '../context/FriendContext'
 import { useAuth } from '../context/AuthContext'
 import { getAvatarUrl } from '../lib/avatar'
 
-export default function FriendsModal({ isOpen, onClose, onToast }) {
+export default function FriendsModal({ isOpen, onClose, onToast, onSelectUser }) {
   const { user } = useAuth()
   const {
     friends,
@@ -45,6 +45,16 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
     setActionLoadingId(null)
     onClose()
   }, [onClose])
+
+  const handleUserClick = (targetUser) => {
+    if (!targetUser?.username) return
+    handleClose()
+    if (onSelectUser) {
+      onSelectUser(targetUser)
+    } else {
+      window.location.assign(`/u/${targetUser.username}`)
+    }
+  }
 
   const handleSearchChange = (val) => {
     setSearchQuery(val)
@@ -234,7 +244,7 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
             type="button"
             onClick={handleClose}
             className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-            title="Close"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -309,24 +319,39 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                         className="flex items-center justify-between p-2.5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] rounded-xl transition-colors group"
                       >
                         <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                          <img
-                            src={getAvatarUrl(u.avatar_url, u.display_name || u.username)}
-                            alt={u.display_name}
-                            className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-                            onError={(e) => {
-                              e.currentTarget.src = getAvatarUrl(null, u.display_name || u.username)
-                            }}
-                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUserClick(u)}
+                            className="shrink-0 cursor-pointer"
+                            aria-label={`View @${u.username}'s profile`}
+                          >
+                            <img
+                              src={getAvatarUrl(u.avatar_url, u.display_name || u.username)}
+                              alt={u.display_name}
+                              className="w-8 h-8 rounded-full object-cover border border-white/10 hover:border-amber-400/50 transition-colors"
+                              onError={(e) => {
+                                e.currentTarget.src = getAvatarUrl(null, u.display_name || u.username)
+                              }}
+                            />
+                          </button>
                           <div className="min-w-0 truncate">
-                            <p className="text-xs font-medium text-white truncate">
+                            <button
+                              type="button"
+                              onClick={() => handleUserClick(u)}
+                              className="text-xs font-medium text-white hover:text-amber-400 transition-colors truncate block text-left cursor-pointer"
+                            >
                               {u.display_name || u.username}
-                            </p>
+                            </button>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-mono text-zinc-400">
+                              <button
+                                type="button"
+                                onClick={() => handleUserClick(u)}
+                                className="text-[11px] font-mono text-zinc-400 hover:text-amber-400 hover:underline transition-colors cursor-pointer text-left"
+                              >
                                 @{u.username}
-                              </span>
+                              </button>
                               {u.public_key && (
-                                <span className="inline-flex items-center text-[10px] text-emerald-400 font-mono" title="E2EE Ready">
+                                <span className="inline-flex items-center text-[10px] text-emerald-400 font-mono">
                                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
                                 </span>
                               )}
@@ -364,7 +389,7 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                               disabled={isLoading}
                               onClick={() => handleCancelRequest({ requestId: u.requestId, username: u.username })}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white/10 hover:bg-rose-500/20 text-zinc-300 hover:text-rose-300 border border-white/10 text-xs font-mono rounded-lg transition-colors cursor-pointer disabled:opacity-50 group/btn min-h-[32px]"
-                              title="Click to cancel pending friend request"
+                              aria-label="Cancel pending friend request"
                             >
                               {isLoading ? (
                                 <Loader2 className="w-3 h-3 animate-spin text-white" />
@@ -420,24 +445,39 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                       className="flex items-center justify-between p-2.5 bg-amber-400/[0.04] hover:bg-amber-400/[0.07] border border-amber-400/20 rounded-xl transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <img
-                          src={getAvatarUrl(req.avatar_url, req.display_name || req.username)}
-                          alt={req.display_name}
-                          className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-                          onError={(e) => {
-                            e.currentTarget.src = getAvatarUrl(null, req.display_name || req.username)
-                          }}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUserClick(req)}
+                          className="shrink-0 cursor-pointer"
+                          aria-label={`View @${req.username}'s profile`}
+                        >
+                          <img
+                            src={getAvatarUrl(req.avatar_url, req.display_name || req.username)}
+                            alt={req.display_name}
+                            className="w-8 h-8 rounded-full object-cover border border-white/10 hover:border-amber-400/50 transition-colors"
+                            onError={(e) => {
+                              e.currentTarget.src = getAvatarUrl(null, req.display_name || req.username)
+                            }}
+                          />
+                        </button>
                         <div className="min-w-0 truncate">
-                          <p className="text-xs font-medium text-white truncate">
+                          <button
+                            type="button"
+                            onClick={() => handleUserClick(req)}
+                            className="text-xs font-medium text-white hover:text-amber-400 transition-colors truncate block text-left cursor-pointer"
+                          >
                             {req.display_name || req.username}
-                          </p>
+                          </button>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-mono text-zinc-400">
+                            <button
+                              type="button"
+                              onClick={() => handleUserClick(req)}
+                              className="text-[11px] font-mono text-zinc-400 hover:text-amber-400 hover:underline transition-colors cursor-pointer text-left"
+                            >
                               @{req.username}
-                            </span>
+                            </button>
                             {req.public_key && (
-                              <span className="inline-flex items-center text-[10px] text-emerald-400 font-mono" title="E2EE Ready">
+                              <span className="inline-flex items-center text-[10px] text-emerald-400 font-mono">
                                 <ShieldCheck className="w-3 h-3 text-emerald-400" />
                               </span>
                             )}
@@ -465,7 +505,7 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                           disabled={isLoading}
                           onClick={() => handleDeclineRequest(req)}
                           className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-500/20 disabled:opacity-50"
-                          title="Decline friend request"
+                          aria-label="Decline friend request"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -495,16 +535,29 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                       className="flex items-center justify-between p-2 bg-white/[0.02] border border-white/[0.06] rounded-xl text-xs"
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2">
-                        <img
-                          src={getAvatarUrl(req.avatar_url, req.display_name || req.username)}
-                          alt={req.display_name}
-                          className="w-7 h-7 rounded-full object-cover shrink-0 border border-white/10"
-                          onError={(e) => {
-                            e.currentTarget.src = getAvatarUrl(null, req.display_name || req.username)
-                          }}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUserClick(req)}
+                          className="shrink-0 cursor-pointer"
+                          aria-label={`View @${req.username}'s profile`}
+                        >
+                          <img
+                            src={getAvatarUrl(req.avatar_url, req.display_name || req.username)}
+                            alt={req.display_name}
+                            className="w-7 h-7 rounded-full object-cover border border-white/10 hover:border-amber-400/50 transition-colors"
+                            onError={(e) => {
+                              e.currentTarget.src = getAvatarUrl(null, req.display_name || req.username)
+                            }}
+                          />
+                        </button>
                         <div className="min-w-0 truncate">
-                          <span className="text-zinc-300 font-mono">@{req.username}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleUserClick(req)}
+                            className="text-zinc-300 font-mono hover:text-amber-400 hover:underline transition-colors cursor-pointer text-left"
+                          >
+                            @{req.username}
+                          </button>
                           <span className="text-[10px] text-zinc-500 font-mono ml-2">Pending</span>
                         </div>
                       </div>
@@ -558,26 +611,40 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                       className="flex items-center justify-between p-2.5 bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-xl transition-colors group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <img
-                          src={getAvatarUrl(friend.avatar_url, friend.display_name || friend.username)}
-                          alt={friend.display_name}
-                          className="w-8 h-8 rounded-full object-cover shrink-0 border border-white/10"
-                          onError={(e) => {
-                            e.currentTarget.src = getAvatarUrl(null, friend.display_name || friend.username)
-                          }}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUserClick(friend)}
+                          className="shrink-0 cursor-pointer"
+                          aria-label={`View @${friend.username}'s profile`}
+                        >
+                          <img
+                            src={getAvatarUrl(friend.avatar_url, friend.display_name || friend.username)}
+                            alt={friend.display_name}
+                            className="w-8 h-8 rounded-full object-cover border border-white/10 hover:border-amber-400/50 transition-colors"
+                            onError={(e) => {
+                              e.currentTarget.src = getAvatarUrl(null, friend.display_name || friend.username)
+                            }}
+                          />
+                        </button>
                         <div className="min-w-0 truncate">
-                          <p className="text-xs font-medium text-white truncate">
+                          <button
+                            type="button"
+                            onClick={() => handleUserClick(friend)}
+                            className="text-xs font-medium text-white hover:text-amber-400 transition-colors truncate block text-left cursor-pointer"
+                          >
                             {friend.display_name || friend.username}
-                          </p>
+                          </button>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-mono text-zinc-400">
+                            <button
+                              type="button"
+                              onClick={() => handleUserClick(friend)}
+                              className="text-[11px] font-mono text-zinc-400 hover:text-amber-400 hover:underline transition-colors cursor-pointer text-left"
+                            >
                               @{friend.username}
-                            </span>
+                            </button>
                             {friend.public_key ? (
                               <span
                                 className="inline-flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20"
-                                title="Zero-knowledge E2EE ready"
                               >
                                 <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
                                 <span>E2EE</span>
@@ -585,7 +652,6 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                             ) : (
                               <span
                                 className="inline-flex items-center gap-1 text-[9px] font-mono text-zinc-500 bg-white/5 px-1.5 py-0.2 rounded"
-                                title="Public recommendations only until user signs in"
                               >
                                 <span>Public only</span>
                               </span>
@@ -600,7 +666,7 @@ export default function FriendsModal({ isOpen, onClose, onToast }) {
                           disabled={isLoading}
                           onClick={() => handleRemoveFriend(friend)}
                           className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-500/20 disabled:opacity-40"
-                          title="Remove from friends"
+                          aria-label="Remove from friends"
                         >
                           {isLoading ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />

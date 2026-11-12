@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { ArrowLeft, Share2, Award, Check, UserPlus, UserCheck, Loader2, Clock } from 'lucide-react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { ArrowLeft, Share2, Award, Check, UserPlus, UserCheck, Loader2, Clock, Download, FileText } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useItems } from '../context/ItemContext'
 import { useFriends } from '../context/FriendContext'
 import { getAvatarUrl } from '../lib/avatar'
 import { KNOWN_USERS } from '../constants/knownUsers'
+import { downloadRecsText, printRecsAsPdf } from '../lib/exportUtils'
 import ItemCard from './ItemCard'
 
 // Public user profile page showing curated recommendations for /u/:username
@@ -27,6 +28,22 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
   const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
   const [isAddingFriend, setIsAddingFriend] = useState(false)
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false)
+  const downloadMenuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target)) {
+        setIsDownloadMenuOpen(false)
+      }
+    }
+    if (isDownloadMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isDownloadMenuOpen])
 
   const itemsRef = React.useRef(items)
   useEffect(() => {
@@ -98,10 +115,24 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
   }, [cleanUsername])
 
   // Get all public items created by or attributed to this user (strictly excluding private vault items)
-  const userItems = items.filter(it => {
-    if (!profile || it.is_private) return false
-    return it.created_by === profile.id || it.creator?.username?.toLowerCase() === profile.username?.toLowerCase()
-  })
+  // Sorted strictly by newest first (created_at DESC, id tie-breaker)
+  const userItems = useMemo(() => {
+    if (!profile) return []
+    return items
+      .filter((it) => {
+        if (it.is_private) return false
+        return (
+          it.created_by === profile.id ||
+          it.creator?.username?.toLowerCase() === profile.username?.toLowerCase()
+        )
+      })
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0
+        if (dateB !== dateA) return dateB - dateA
+        return String(a.id || '').localeCompare(String(b.id || ''))
+      })
+  }, [items, profile])
 
   const isOwnProfile = Boolean(user?.id && profile?.id && user.id === profile.id)
   const isFriend = Boolean(profile?.id && friends.some((f) => f.id === profile.id))
@@ -253,7 +284,7 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
                 disabled={isAddingFriend}
                 onClick={handleAcceptRequest}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-full text-xs font-semibold font-body transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50"
-                title={`Accept friend request from @${profile.username}`}
+                aria-label={`Accept friend request from @${profile.username}`}
               >
                 {isAddingFriend ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
@@ -268,7 +299,7 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
                 disabled={isAddingFriend}
                 onClick={handleCancelRequest}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/10 hover:bg-rose-500/20 text-zinc-300 hover:text-rose-300 border border-white/10 rounded-full text-xs font-mono transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50 group/req"
-                title="Click to cancel friend request"
+                aria-label="Cancel friend request"
               >
                 {isAddingFriend ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -284,7 +315,7 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
                 disabled={isAddingFriend}
                 onClick={handleSendFriendRequest}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-zinc-200 text-black rounded-full text-xs font-semibold font-body transition-all cursor-pointer min-h-[40px] shadow-sm active:scale-95 disabled:opacity-50"
-                title={`Add @${profile.username} as friend`}
+                aria-label={`Add @${profile.username} as friend`}
               >
                 {isAddingFriend ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
@@ -295,6 +326,50 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
               </button>
             )
           )}
+
+          {/* Download Recs Button & Menu */}
+          <div className="relative" ref={downloadMenuRef}>
+            <button
+              type="button"
+              disabled={userItems.length === 0}
+              onClick={() => setIsDownloadMenuOpen(prev => !prev)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] rounded-full text-xs font-mono text-zinc-200 transition-colors cursor-pointer min-h-[40px] disabled:opacity-40"
+              aria-label="Download public recommendations"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Download Recs</span>
+            </button>
+
+            {isDownloadMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadMenuOpen(false)
+                    printRecsAsPdf({ userProfile: profile, items: userItems })
+                    onToast?.({ message: `Opened PDF print sheet for ${userItems.length} recommendations.` })
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-amber-400" />
+                  <span>PDF Sheet (.pdf)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDownloadMenuOpen(false)
+                    downloadRecsText({ userProfile: profile, items: userItems })
+                    onToast?.({ message: `Downloaded ${userItems.length} recommendations as .txt` })
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 text-zinc-400" />
+                  <span>Plain Text (.txt)</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"

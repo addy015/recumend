@@ -186,7 +186,6 @@ export default function LegalView({ onBack }) {
           <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 text-xs font-mono text-zinc-300 space-y-1">
             <div><strong className="text-white">Application:</strong> Recumend</div>
             <div><strong className="text-white">Developer:</strong> abhshekmaurya1999@gmail.com</div>
-            <div><strong className="text-white">Repository:</strong> github.com/addy015/recumend</div>
           </div>
         </section>
       </div>

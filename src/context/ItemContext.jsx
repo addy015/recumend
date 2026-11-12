@@ -10,6 +10,7 @@ const ItemContext = createContext(null)
 // Storage keys for offline demo mode
 const LOCAL_ITEMS_KEY = 'recumend_items_data'
 const LOCAL_RECS_KEY = 'recumend_user_recs'
+const LOCAL_WATCHED_KEY = 'recumend_watched_items'
 
 // Default seed recommendations shown in demo mode
 const INITIAL_ITEMS = [
@@ -86,11 +87,62 @@ export function ItemProvider({ children }) {
   const { user, profile, providerToken, savePublicKeyToProfile } = useAuth()
   const [items, setItems] = useState([])
   const [userRecs, setUserRecs] = useState(new Set())
+  const [watchedItemIds, setWatchedItemIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [vaultKeys, setVaultKeys] = useState(null)
   const [isVaultSyncing, setIsVaultSyncing] = useState(false)
   const [vaultError, setVaultError] = useState(null)
   const votingInProgress = useRef(new Set())
+  const isInitialWatchedMount = useRef(true)
+
+  // Load user's watched items from local cache
+  useEffect(() => {
+    isInitialWatchedMount.current = true
+    const userId = user?.id || 'guest'
+    try {
+      const raw = localStorage.getItem(`${LOCAL_WATCHED_KEY}_${userId}`)
+      if (raw) {
+        setWatchedItemIds(new Set(JSON.parse(raw)))
+      } else {
+        setWatchedItemIds(new Set())
+      }
+    } catch (err) {
+      console.warn('Failed to parse watched items cache:', err)
+      setWatchedItemIds(new Set())
+    }
+  }, [user?.id])
+
+  // Persist watched items changes asynchronously to localStorage outside the render loop
+  useEffect(() => {
+    if (isInitialWatchedMount.current) {
+      isInitialWatchedMount.current = false
+      return
+    }
+    const userId = user?.id || 'guest'
+    try {
+      localStorage.setItem(`${LOCAL_WATCHED_KEY}_${userId}`, JSON.stringify([...watchedItemIds]))
+    } catch {
+      // ignore
+    }
+  }, [watchedItemIds, user?.id])
+
+  // Toggle watched status for an item (instant pure update, zero disk I/O lag)
+  const toggleWatched = useCallback((itemId) => {
+    if (!itemId) return
+    setWatchedItemIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemId)) {
+        next.delete(itemId)
+      } else {
+        next.add(itemId)
+      }
+      return next
+    })
+  }, [])
+
+  const isWatched = useCallback((itemId) => {
+    return watchedItemIds.has(itemId)
+  }, [watchedItemIds])
 
   // Synchronize unified encryption vault (AES-256 for personal vault + ECDH P-256 for peer sharing)
   useEffect(() => {
@@ -1225,6 +1277,9 @@ export function ItemProvider({ children }) {
       myPrivateItems,
       upvotedItems,
       userRecs,
+      watchedItemIds,
+      toggleWatched,
+      isWatched,
       loading,
       vaultKeys,
       isVaultSyncing,

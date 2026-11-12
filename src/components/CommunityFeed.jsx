@@ -86,7 +86,6 @@ export default function CommunityFeed({
                 ? "bg-white text-black font-semibold shadow-sm"
                 : "text-white hover:bg-white/[0.08]"
             }`}
-            title="Ranked strictly by recommendations"
           >
             <Trophy className={`w-3.5 h-3.5 ${sortBy === "overall" ? "text-amber-500 fill-amber-500" : "text-amber-400"}`} />
             <span>Leaderboard</span>
@@ -99,7 +98,6 @@ export default function CommunityFeed({
                 ? "bg-white text-black font-semibold shadow-sm"
                 : "text-white hover:bg-white/[0.08]"
             }`}
-            title="Ranked strictly by newest submissions"
           >
             <Clock className={`w-3.5 h-3.5 ${sortBy === "recent" ? "text-sky-500" : "text-sky-400"}`} />
             <span>Recent</span>

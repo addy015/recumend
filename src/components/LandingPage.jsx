@@ -26,6 +26,7 @@ export default function LandingPage({
   onOpenFriendsModal,
   onOpenShared,
   isAuthenticating,
+  loading,
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mockItems, setMockItems] = useState({
@@ -85,14 +86,18 @@ export default function LandingPage({
           </div>
 
           <div className="flex items-center gap-3">
-            {user && profile ? (
+            {loading && !profile ? (
+              <div className="flex items-center gap-2 p-1.5 border border-white/[0.08] bg-white/[0.03] rounded-full min-h-[44px]">
+                <div className="w-7 h-7 rounded-full bg-zinc-800" />
+                <div className="w-16 h-3 bg-zinc-800 rounded-full mr-2 hidden sm:block" />
+              </div>
+            ) : user && profile ? (
               <div className="relative" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2.5 p-1.5 hover:bg-white/[0.06] border border-white/[0.1] rounded-full transition-all cursor-pointer min-h-[44px]"
-                  title={`Logged in as @${profile.username}`}
-                  aria-label="User navigation menu"
+                  aria-label={`Logged in as @${profile.username}`}
                 >
                   <img
                     src={getAvatarUrl(
@@ -212,9 +217,10 @@ export default function LandingPage({
                   </div>
                 )}
               </div>
-            ) : user ? (
-              <div className="flex items-center gap-2 p-1.5 border border-white/[0.1] rounded-full">
+            ) : (loading && !profile) || user ? (
+              <div className="flex items-center gap-2 p-1.5 border border-white/[0.1] rounded-full min-h-[40px]">
                 <div className="w-7 h-7 rounded-full bg-zinc-800" />
+                <div className="w-16 h-3 bg-zinc-800 rounded-full hidden sm:block" />
               </div>
             ) : (
               <button
@@ -335,7 +341,7 @@ export default function LandingPage({
                         ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
                         : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
                     }`}
-                    title="Click to test tactile upvote toggle"
+                    aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
                       className={`w-5 h-5 ${mockItems.item1.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}
@@ -383,7 +389,7 @@ export default function LandingPage({
                         ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
                         : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
                     }`}
-                    title="Click to test tactile upvote toggle"
+                    aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
                       className={`w-5 h-5 ${mockItems.item2.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}
@@ -427,7 +433,7 @@ export default function LandingPage({
                         ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
                         : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
                     }`}
-                    title="Click to test tactile upvote toggle"
+                    aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
                       className={`w-5 h-5 ${mockItems.item3.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}

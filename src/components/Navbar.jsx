@@ -31,6 +31,7 @@ export default function Navbar({
   const {
     user,
     profile,
+    loading,
     signInWithGoogle,
     signOut,
     isAuthenticating,
@@ -248,18 +249,23 @@ export default function Navbar({
 
           {/* Action Buttons & Auth */}
           <div className="flex items-center gap-2 shrink-0">
-            {user && profile ? (
+            {loading && !profile ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 border border-white/[0.08] bg-white/[0.03] rounded-full min-h-[40px] select-none">
+                <div className="w-6 h-6 rounded-full bg-zinc-800" />
+                <div className="w-16 h-3 bg-zinc-800 rounded-full hidden sm:block" />
+              </div>
+            ) : user && profile ? (
               <>
                 <button
                   type="button"
                   onClick={onOpenFriendsModal}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141414] hover:bg-white/[0.08] border border-white/[0.1] rounded-full text-zinc-300 hover:text-white transition-all cursor-pointer min-h-[40px] text-xs font-mono"
-                  title="Friends & Connections"
+                  aria-label="Friends & Connections"
                 >
                   <Users className="w-3.5 h-3.5 text-zinc-300" />
                   <span className="hidden sm:inline">Friends</span>
                   {incomingRequests.length > 0 ? (
-                    <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-400 text-black" title={`${incomingRequests.length} incoming friend request(s)`}>
+                    <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-amber-400 text-black">
                       {incomingRequests.length}
                     </span>
                   ) : friends.length > 0 ? (
@@ -274,7 +280,7 @@ export default function Navbar({
                   type="button"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2.5 p-1.5 hover:bg-white/[0.06] border border-white/[0.1] rounded-full transition-all cursor-pointer min-h-[44px]"
-                  title={`Logged in as @${profile.username}`}
+                  aria-label={`Logged in as @${profile.username}`}
                 >
                   <img
                     src={getAvatarUrl(profile.avatar_url, profile.display_name || profile.username)}
@@ -418,7 +424,7 @@ export default function Navbar({
             type="button"
             onClick={clearAuthError}
             className="p-1 hover:bg-rose-900/50 text-rose-300 rounded-md transition-colors shrink-0"
-            title="Dismiss"
+            aria-label="Dismiss error"
           >
             <X className="w-3.5 h-3.5" />
           </button>

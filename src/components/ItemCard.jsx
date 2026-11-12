@@ -148,7 +148,7 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
                 className={`shrink-0 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user self-end sm:self-auto ${
                   hasNote ? 'min-h-[26px]' : 'min-h-0 py-0'
                 }`}
-                title={`View @${item.creator.username}'s public profile`}
+                aria-label={`View @${item.creator.username}'s public profile`}
               >
                 <img
                   src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
@@ -197,7 +197,6 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
             onOpenShare?.(item)
           }}
           className="flex flex-col items-center justify-center min-w-[2.5rem] w-10 sm:w-11 py-2 px-1 border border-white/[0.1] bg-[#151515] hover:bg-white/[0.08] text-zinc-400 hover:text-white rounded-xl transition-all duration-150 cursor-pointer active:scale-95 min-h-[46px]"
-          title="Share recommendation with friends"
           aria-label="Share recommendation"
         >
           <Share2 className="w-4 h-4" />
@@ -218,15 +217,6 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
               ? 'bg-amber-400 text-black border-amber-400 active:scale-95 shadow-[0_0_16px_rgba(251,191,36,0.22)]'
               : 'bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95'
           }`}
-          title={
-            item.is_private
-              ? 'Private items do not participate in public upvotes'
-              : isOwner
-              ? 'You created this recommendation (locked at +1 vote)'
-              : isRecommended
-              ? 'Remove recommendation'
-              : 'Recommend this'
-          }
           aria-label={
             item.is_private
               ? 'Private item'

@@ -62,7 +62,6 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
           tabIndex={canScrollLeft ? 0 : -1}
           aria-label="Scroll categories left"
           className="p-2 rounded-full bg-[#141414] hover:bg-[#202020] border border-white/[0.12] text-zinc-300 pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
-          title="Scroll left"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
         </button>
@@ -110,7 +109,6 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }) {
           tabIndex={canScrollRight ? 0 : -1}
           aria-label="Scroll categories right"
           className="p-2 rounded-full bg-[#141414] hover:bg-[#202020] border border-white/[0.12] text-zinc-300 pointer-events-auto cursor-pointer transition-transform hover:scale-105 active:scale-95"
-          title="Scroll right"
         >
           <ChevronRight className="w-3.5 h-3.5" />
         </button>

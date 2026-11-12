@@ -425,7 +425,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                           type="button"
                           onClick={() => handleOpenProfile(sender)}
                           className="flex items-center gap-2 group/sender text-left cursor-pointer transition-opacity hover:opacity-90"
-                          title={`View @${sender.username}'s public profile`}
+                          aria-label={`View @${sender.username}'s public profile`}
                         >
                           <img
                             src={getAvatarUrl(sender?.avatar_url, sender?.display_name || sender?.username)}
@@ -467,7 +467,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                           type="button"
                           onClick={() => handleOpenProfile(recipient)}
                           className="flex items-center gap-2 group/recipient text-left cursor-pointer transition-opacity hover:opacity-90"
-                          title={`View @${recipient.username}'s public profile`}
+                          aria-label={`View @${recipient.username}'s public profile`}
                         >
                           <img
                             src={getAvatarUrl(recipient?.avatar_url, recipient?.display_name || recipient?.username)}
@@ -533,7 +533,6 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                       item.is_read ? (
                         <span
                           className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          title="Friend has opened their With Me tab and viewed this recommendation"
                         >
                           <CheckCheck className="w-3 h-3 text-emerald-400" />
                           <span>Seen</span>
@@ -541,7 +540,6 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-white/10"
-                          title="Delivered to friend's inbox (not viewed yet)"
                         >
                           <Check className="w-3 h-3 text-zinc-400" />
                           <span>Sent</span>
@@ -593,7 +591,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                               type="button"
                               onClick={() => handleOpenProfile(sender)}
                               className="hover:underline cursor-pointer inline-flex items-center gap-1 text-amber-400"
-                              title={`View @${sender.username}'s profile`}
+                              aria-label={`View @${sender.username}'s profile`}
                             >
                               Note from @{sender.username}:
                             </button>
@@ -645,7 +643,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                             disabled={Boolean(savingAction?.id === item.id) || !item._isDecrypted}
                             onClick={() => handleSaveToPrivateVault(item)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-semibold rounded-xl border border-white/10 transition-colors cursor-pointer disabled:opacity-40 min-h-[36px]"
-                            title="Save encrypted in your personal Private Vault"
+                            aria-label="Save encrypted in your personal Private Vault"
                           >
                             {savingAction?.id === item.id && savingAction?.isPrivate ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
@@ -668,7 +666,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                             disabled={Boolean(savingAction?.id === item.id) || !item._isDecrypted}
                             onClick={() => handleRecommendPublicly(item, matchedPublicItem)}
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-black text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40 shadow-sm min-h-[36px]"
-                            title="Recommend this on the leaderboard (+1 vote)"
+                            aria-label="Recommend this on the leaderboard (+1 vote)"
                           >
                             {savingAction?.id === item.id && !savingAction?.isPrivate ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
@@ -683,7 +681,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                             disabled={Boolean(savingAction?.id === item.id) || !item._isDecrypted}
                             onClick={() => handleRecommendPublicly(item, null)}
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-semibold rounded-xl border border-white/10 transition-colors cursor-pointer disabled:opacity-40 min-h-[36px]"
-                            title="Publish as a public recommendation on leaderboard"
+                            aria-label="Publish as a public recommendation on leaderboard"
                           >
                             {savingAction?.id === item.id && !savingAction?.isPrivate ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
@@ -701,7 +699,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                           disabled={deletingId === item.id}
                           onClick={() => handleDeleteShare(item.id)}
                           className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-rose-500/20 disabled:opacity-40"
-                          title="Dismiss from shared list"
+                          aria-label="Dismiss from shared list"
                         >
                           {deletingId === item.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />
@@ -724,7 +722,7 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
                           disabled={deletingId === item.id}
                           onClick={() => handleDeleteShare(item.id)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer border border-white/[0.08] hover:border-rose-500/20 disabled:opacity-40 text-xs font-mono"
-                          title="Delete this recommendation"
+                          aria-label="Delete this recommendation"
                         >
                           {deletingId === item.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />

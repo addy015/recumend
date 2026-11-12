@@ -60,7 +60,7 @@ function getRoute() {
 }
 
 function MainContent() {
-  const { user, profile, signInWithGoogle, signOut, isAuthenticating } = useAuth()
+  const { user, profile, loading, signInWithGoogle, signOut, isAuthenticating } = useAuth()
   const { unreadCount = 0 } = useFriends() || {}
 
   // Track active route derived from URL (path / hash)
@@ -217,6 +217,7 @@ function MainContent() {
             navigate('/feed#/shared')
           }}
           isAuthenticating={isAuthenticating}
+          loading={loading}
         />
       ) : (
         <>
@@ -257,7 +258,7 @@ function MainContent() {
           />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 pb-28">
         {route.page === 'privacy' ? (
           <LegalView onBack={() => navigate('/')} />
         ) : route.page === 'profile' && route.username ? (
@@ -359,6 +360,12 @@ function MainContent() {
                 onOpenAddModal={handleOpenAddModal}
                 searchQuery={searchQuery}
                 onOpenShare={handleOpenShare}
+                onSelectUser={(creator) => {
+                  if (creator?.username) {
+                    navigate(`/u/${creator.username}`)
+                  }
+                }}
+                onToast={showToast}
               />
             </div>
 
@@ -379,7 +386,7 @@ function MainContent() {
       </main>
 
       {/* Minimal Footer */}
-      <footer className="shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#08090C]/40 backdrop-blur-md border-t border-white/[0.08] mt-auto">
+      <footer className="relative z-0 shrink-0 py-8 px-4 sm:px-6 font-mono text-xs text-zinc-500 bg-[#08090C]/40 backdrop-blur-md border-t border-white/[0.08] mt-auto">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
             <button
@@ -442,6 +449,12 @@ function MainContent() {
         isOpen={isFriendsModalOpen}
         onClose={() => setIsFriendsModalOpen(false)}
         onToast={showToast}
+        onSelectUser={(u) => {
+          setIsFriendsModalOpen(false)
+          if (u?.username) {
+            navigate(`/u/${u.username}`)
+          }
+        }}
       />
 
       {/* Floating Toast Notification Banner */}

@@ -431,7 +431,7 @@ export default function AddRecommendationModal({
                 rows={2}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Why do you recommend this?"
+                placeholder="Write whatever you want here bro.."
                 className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors resize-none"
               />
             </div>
