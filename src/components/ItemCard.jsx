@@ -184,7 +184,7 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
       </div>
 
       {/* Action Buttons Container */}
-      <div className="flex items-center gap-2 shrink-0 self-center">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-center">
         {/* Share Button */}
         <button
           type="button"
@@ -196,11 +196,11 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
             }
             onOpenShare?.(item)
           }}
-          className="flex flex-col items-center justify-center min-w-[2.5rem] w-10 sm:w-11 py-2 px-1 border border-white/[0.1] bg-[#151515] hover:bg-white/[0.08] text-zinc-400 hover:text-white rounded-xl transition-all duration-150 cursor-pointer active:scale-95 min-h-[46px]"
+          className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
           aria-label="Share recommendation"
         >
-          <Share2 className="w-4 h-4" />
-          <span className="text-[10px] font-mono mt-0.5 text-zinc-400">Share</span>
+          <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+          <span className="hidden sm:inline">Share</span>
         </button>
 
         {/* Upvote Button */}
@@ -208,14 +208,14 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
           type="button"
           onClick={handleVote}
           disabled={isOwner || item.is_private}
-          className={`flex flex-col items-center justify-center min-w-[2.75rem] sm:min-w-[3.25rem] w-11 sm:w-12 py-2 px-1 border transition-all duration-150 shrink-0 select-none min-h-[46px] rounded-xl cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-mono font-bold rounded-xl transition-all active:scale-95 duration-75 select-none min-h-[40px] shrink-0 border ${
             item.is_private
               ? 'bg-white/[0.02] border-white/[0.04] text-zinc-600 cursor-not-allowed opacity-40'
               : isOwner
               ? 'bg-amber-400/10 border-amber-400/25 text-amber-300 cursor-default'
               : isRecommended
-              ? 'bg-amber-400 text-black border-amber-400 active:scale-95 shadow-[0_0_16px_rgba(251,191,36,0.22)]'
-              : 'bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95'
+              ? 'bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)] cursor-pointer'
+              : 'bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30 cursor-pointer'
           }`}
           aria-label={
             item.is_private
@@ -228,27 +228,19 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
           }
         >
           <ArrowBigUp
-            className={`w-5 h-5 transition-transform duration-150 ${
+            className={`w-4 h-4 shrink-0 transition-transform duration-75 ${
               isRecommended && !item.is_private
-                ? 'fill-black stroke-black scale-105'
+                ? 'fill-black stroke-black'
                 : isOwner
                 ? 'fill-amber-400 stroke-amber-400'
-                : 'text-zinc-400 group-hover:text-amber-300'
+                : 'text-zinc-400'
             }`}
           />
-          <span
-            className={`text-xs font-mono font-bold mt-0.5 tabular-nums ${
-              isRecommended && !item.is_private
-                ? 'text-black'
-                : isOwner
-                ? 'text-amber-300'
-                : 'text-zinc-300 group-hover:text-amber-200'
-            }`}
-          >
+          <span className="tabular-nums font-bold">
             {item.recommend_count}
           </span>
           {isOwner && !item.is_private && (
-            <span className="text-[8px] font-mono text-amber-400/90 uppercase font-semibold leading-none mt-0.5 tracking-tighter">
+            <span className="text-[9px] font-mono text-amber-400/90 uppercase font-semibold leading-none tracking-tight hidden sm:inline">
               Lock
             </span>
           )}

@@ -336,19 +336,17 @@ export default function LandingPage({
                   <button
                     type="button"
                     onClick={() => toggleMockVote("item1")}
-                    className={`flex flex-col items-center justify-center min-w-[2.75rem] w-11 py-2 px-1 border transition-all duration-150 shrink-0 select-none min-h-[46px] rounded-xl cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 py-2 border transition-all active:scale-95 duration-75 shrink-0 select-none min-h-[40px] rounded-xl cursor-pointer font-mono text-xs font-bold self-center ${
                       mockItems.item1.voted
-                        ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
-                        : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
+                        ? "bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)]"
+                        : "bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30"
                     }`}
                     aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
-                      className={`w-5 h-5 ${mockItems.item1.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}
+                      className={`w-4 h-4 shrink-0 transition-transform duration-75 ${mockItems.item1.voted ? "fill-black stroke-black" : "text-zinc-400"}`}
                     />
-                    <span
-                      className={`text-xs font-mono font-bold mt-0.5 tabular-nums ${mockItems.item1.voted ? "text-black" : "text-zinc-300"}`}
-                    >
+                    <span className="tabular-nums font-bold">
                       {mockItems.item1.votes}
                     </span>
                   </button>
@@ -384,19 +382,17 @@ export default function LandingPage({
                   <button
                     type="button"
                     onClick={() => toggleMockVote("item2")}
-                    className={`flex flex-col items-center justify-center min-w-[2.75rem] w-11 py-2 px-1 border transition-all duration-150 shrink-0 select-none min-h-[46px] rounded-xl cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 py-2 border transition-all active:scale-95 duration-75 shrink-0 select-none min-h-[40px] rounded-xl cursor-pointer font-mono text-xs font-bold self-center ${
                       mockItems.item2.voted
-                        ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
-                        : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
+                        ? "bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)]"
+                        : "bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30"
                     }`}
                     aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
-                      className={`w-5 h-5 ${mockItems.item2.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}
+                      className={`w-4 h-4 shrink-0 transition-transform duration-75 ${mockItems.item2.voted ? "fill-black stroke-black" : "text-zinc-400"}`}
                     />
-                    <span
-                      className={`text-xs font-mono font-bold mt-0.5 tabular-nums ${mockItems.item2.voted ? "text-black" : "text-zinc-300"}`}
-                    >
+                    <span className="tabular-nums font-bold">
                       {mockItems.item2.votes}
                     </span>
                   </button>
@@ -428,19 +424,17 @@ export default function LandingPage({
                   <button
                     type="button"
                     onClick={() => toggleMockVote("item3")}
-                    className={`flex flex-col items-center justify-center min-w-[2.75rem] w-11 py-2 px-1 border transition-all duration-150 shrink-0 select-none min-h-[46px] rounded-xl cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 py-2 border transition-all active:scale-95 duration-75 shrink-0 select-none min-h-[40px] rounded-xl cursor-pointer font-mono text-xs font-bold self-center ${
                       mockItems.item3.voted
-                        ? "bg-amber-400 text-black border-amber-400 shadow-[0_0_16px_rgba(251,191,36,0.22)] active:scale-95"
-                        : "bg-[#151515] hover:bg-amber-400/10 border-white/[0.1] hover:border-amber-400/30 text-zinc-400 hover:text-amber-300 active:scale-95"
+                        ? "bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)]"
+                        : "bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30"
                     }`}
                     aria-label="Toggle upvote"
                   >
                     <ArrowBigUp
-                      className={`w-5 h-5 ${mockItems.item3.voted ? "fill-black stroke-black scale-105" : "text-zinc-400 group-hover:text-amber-300"}`}
+                      className={`w-4 h-4 shrink-0 transition-transform duration-75 ${mockItems.item3.voted ? "fill-black stroke-black" : "text-zinc-400"}`}
                     />
-                    <span
-                      className={`text-xs font-mono font-bold mt-0.5 tabular-nums ${mockItems.item3.voted ? "text-black" : "text-zinc-300"}`}
-                    >
+                    <span className="tabular-nums font-bold">
                       {mockItems.item3.votes}
                     </span>
                   </button>

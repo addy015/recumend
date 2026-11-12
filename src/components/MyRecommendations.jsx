@@ -596,19 +596,26 @@ export default function MyRecommendations({
             <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
               <Bookmark className="w-5 h-5" />
             </div>
-            <p className="font-display text-sm font-semibold text-white">
-              No recommendations yet
-            </p>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-              Share your favorite movies, books, games, and more with the community.
-            </p>
+            <div className="space-y-1">
+              <p className="font-display text-sm font-semibold text-white">
+                You haven't added any public recommendations yet
+              </p>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                Recommend your favorite movies, anime, books, or games to place them on the community leaderboard.
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => onOpenAddModal?.({ isPrivate: false })}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[40px]"
+              onClick={() =>
+                onOpenAddModal?.({
+                  isPrivate: false,
+                  category: createdCategory !== "all" ? createdCategory : "movie",
+                })
+              }
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Your First Recommendation</span>
+              <span>Add First Recommendation</span>
             </button>
           </div>
         ) : filteredCreatedItems.length === 0 ? (
@@ -619,9 +626,18 @@ export default function MyRecommendations({
             </p>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
               {searchQuery?.trim()
-                ? `No recommendations matching "${searchQuery}".`
-                : `No items found matching the selected filter.`}
+                ? `No public recommendations matching "${searchQuery}".`
+                : `You haven't added any public recommendations in "${CATEGORIES.find((c) => c.id === createdCategory)?.label || createdCategory}" yet.`}
             </p>
+            {createdCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => setCreatedCategory("all")}
+                className="mt-2 px-4 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold rounded-full transition-colors cursor-pointer min-h-[36px]"
+              >
+                View All ({myItems.length})
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -895,6 +911,27 @@ export default function MyRecommendations({
                           </span>
                         )}
                         {item.metadata?.platform && <span>• {item.metadata.platform}</span>}
+                        {item.creator?.username && (
+                          <span className="hidden sm:inline-flex items-center gap-1.5">
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => onSelectUser ? onSelectUser(item.creator) : window.location.assign(`/u/${item.creator.username}`)}
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                              aria-label={`View @${item.creator.username}'s profile`}
+                            >
+                              <img
+                                src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
+                                alt=""
+                                className="w-3.5 h-3.5 object-cover rounded-full shrink-0"
+                                onError={(e) => {
+                                  e.currentTarget.src = getAvatarUrl(null, item.creator.display_name || item.creator.username);
+                                }}
+                              />
+                              <span>@{item.creator.username}</span>
+                            </button>
+                          </span>
+                        )}
                       </div>
 
                       <h3 className={`font-display font-bold text-sm sm:text-base break-words line-clamp-2 transition-colors duration-75 ${
@@ -905,50 +942,10 @@ export default function MyRecommendations({
                         {item.title}
                       </h3>
 
-                      {/* Recommender Note & Username Attribution (Exact Leaderboard Style) */}
-                      {(item.metadata?.note || item.creator?.username) && (
-                        <div className="pt-1 flex items-baseline justify-between gap-3 flex-wrap sm:flex-nowrap">
-                          {item.metadata?.note ? (
-                            <div className="flex-1 min-w-0">
-                              <p className="border-l-2 border-amber-400/40 pl-2.5 text-xs text-zinc-300 italic leading-relaxed break-words line-clamp-2">
-                                "{item.metadata.note}"
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="flex-1" />
-                          )}
-
-                          {item.creator?.username && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onSelectUser) {
-                                  onSelectUser(item.creator);
-                                } else {
-                                  window.location.assign(`/u/${item.creator.username}`);
-                                }
-                              }}
-                              className="shrink-0 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user self-end sm:self-auto min-h-[26px]"
-                              aria-label={`View @${item.creator.username}'s public profile`}
-                            >
-                              <img
-                                src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
-                                alt=""
-                                className="w-4 h-4 object-cover rounded-full shrink-0"
-                                onError={(e) => {
-                                  e.currentTarget.src = getAvatarUrl(null, item.creator.display_name || item.creator.username);
-                                }}
-                              />
-                              <span>
-                                <span className="text-zinc-600">@</span>
-                                <span className="hover:underline text-zinc-400 group-hover/user:text-white">
-                                  {item.creator.username}
-                                </span>
-                              </span>
-                            </button>
-                          )}
-                        </div>
+                      {item.metadata?.note && (
+                        <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
+                          "{item.metadata.note}"
+                        </p>
                       )}
 
                       {getSafeExternalLink(item.metadata?.channel_link) && (
@@ -965,96 +962,132 @@ export default function MyRecommendations({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
-                    {/* Watched Tickbox Button (to the left of Share button) */}
-                    <button
-                      type="button"
-                      onClick={() => toggleWatched(item.id)}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-medium transition-all active:scale-95 duration-75 cursor-pointer min-h-[40px] select-none ${
-                        isItemWatched
-                          ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
-                          : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-zinc-400 hover:text-zinc-200"
-                      }`}
-                      aria-label={isItemWatched ? "Mark as unwatched" : "Mark as watched"}
-                    >
-                      <span
-                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
-                          isItemWatched
-                            ? "bg-emerald-500 border-emerald-400 text-black"
-                            : "border-zinc-500 bg-transparent"
-                        }`}
-                      >
-                        {isItemWatched && <Check className="w-3 h-3 stroke-[3]" />}
-                      </span>
-                      <span className="text-[11px] font-mono hidden sm:inline">
-                        {isItemWatched ? "Watched" : "Watch"}
-                      </span>
-                    </button>
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
+                    <div className="flex items-center gap-1.5 sm:hidden">
+                      {item.creator?.username && (
+                        <button
+                          type="button"
+                          onClick={() => onSelectUser ? onSelectUser(item.creator) : window.location.assign(`/u/${item.creator.username}`)}
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                          aria-label={`View @${item.creator.username}'s profile`}
+                        >
+                          <img
+                            src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
+                            alt=""
+                            className="w-3.5 h-3.5 object-cover rounded-full shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.src = getAvatarUrl(null, item.creator.display_name || item.creator.username);
+                            }}
+                          />
+                          <span>@{item.creator.username}</span>
+                        </button>
+                      )}
+                    </div>
 
-                    {/* Share Button */}
-                    <button
-                      type="button"
-                      onClick={() => onOpenShare?.(item)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
-                      aria-label="Share recommendation"
-                    >
-                      <Share2 className="w-3.5 h-3.5 text-zinc-400" />
-                      <span className="hidden sm:inline">Share</span>
-                    </button>
-
-                    {/* Upvote Pill */}
-                    <button
-                      type="button"
-                      onClick={() => toggleRecommend(item.id)}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-black text-xs font-mono font-medium rounded-full transition-colors group cursor-pointer min-h-[40px] shadow-[0_0_12px_rgba(251,191,36,0.2)]"
-                      aria-label="Remove recommendation"
-                    >
-                      <ArrowBigUp className="w-4 h-4 fill-black stroke-black group-hover:fill-rose-600 group-hover:stroke-rose-600" />
-                      <span className="font-bold">{item.recommend_count}</span>
-                      <span className="text-[11px] group-hover:hidden">Upvoted</span>
-                      <span className="text-[11px] hidden group-hover:inline text-rose-600">Remove</span>
-                    </button>
-
-                    {/* 3-Dots Dropdown Menu */}
-                    <div className={`relative ${isMenuActive ? "z-40" : ""}`} data-card-menu>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* Watched Tickbox Button (to the left of Share button) */}
                       <button
                         type="button"
-                        onClick={() => setActiveMenuId(isMenuActive ? null : item.id)}
-                        className="p-2.5 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px] flex items-center justify-center transition-colors"
-                        aria-label="More options"
+                        onClick={() => toggleWatched(item.id)}
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-medium transition-all active:scale-95 duration-75 cursor-pointer min-h-[40px] select-none ${
+                          isItemWatched
+                            ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
+                            : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-zinc-400 hover:text-zinc-200"
+                        }`}
+                        aria-label={isItemWatched ? "Mark as unwatched" : "Mark as watched"}
                       >
-                        <MoreVertical className="w-4 h-4 text-zinc-400" />
+                        <span
+                          className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                            isItemWatched
+                              ? "bg-emerald-500 border-emerald-400 text-black"
+                              : "border-zinc-500 bg-transparent"
+                          }`}
+                        >
+                          {isItemWatched && <Check className="w-3 h-3 stroke-[3]" />}
+                        </span>
+                        <span className="text-[11px] font-mono hidden sm:inline">
+                          {isItemWatched ? "Watched" : "Watch"}
+                        </span>
                       </button>
 
-                      {isMenuActive && (
-                        <div className="absolute right-0 mt-1.5 w-44 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
-                          {/* Move to Top */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveMenuId(null);
-                              handleMoveToTop("upvoted", item.id);
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
-                          >
-                            <ChevronsUp className="w-4 h-4 text-amber-400" />
-                            <span>Move to Top</span>
-                          </button>
+                      {/* Share Button */}
+                      <button
+                        type="button"
+                        onClick={() => onOpenShare?.(item)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
+                        aria-label="Share recommendation"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="hidden sm:inline">Share</span>
+                      </button>
 
-                          {/* Move to Bottom */}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveMenuId(null);
-                              handleMoveToBottom("upvoted", item.id);
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
-                          >
-                            <ChevronsDown className="w-4 h-4 text-zinc-400" />
-                            <span>Move to Bottom</span>
-                          </button>
-                        </div>
-                      )}
+                      {/* Compact Upvote Button */}
+                      <button
+                        type="button"
+                        onClick={() => toggleRecommend(item.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-mono font-bold rounded-xl transition-all active:scale-95 duration-75 cursor-pointer min-h-[40px] select-none shadow-[0_0_12px_rgba(251,191,36,0.18)]"
+                        aria-label="Remove upvote"
+                      >
+                        <ArrowBigUp className="w-4 h-4 fill-black stroke-black shrink-0" />
+                        <span className="font-bold tabular-nums">{item.recommend_count}</span>
+                      </button>
+
+                      {/* 3-Dots Dropdown Menu */}
+                      <div className={`relative ${isMenuActive ? "z-40" : ""}`} data-card-menu>
+                        <button
+                          type="button"
+                          onClick={() => setActiveMenuId(isMenuActive ? null : item.id)}
+                          className="p-2.5 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px] flex items-center justify-center transition-colors"
+                          aria-label="More options"
+                        >
+                          <MoreVertical className="w-4 h-4 text-zinc-400" />
+                        </button>
+
+                        {isMenuActive && (
+                          <div className="absolute right-0 mt-1.5 w-44 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                            {/* Move to Top */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                handleMoveToTop("upvoted", item.id);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <ChevronsUp className="w-4 h-4 text-amber-400" />
+                              <span>Move to Top</span>
+                            </button>
+
+                            {/* Move to Bottom */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                handleMoveToBottom("upvoted", item.id);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <ChevronsDown className="w-4 h-4 text-zinc-400" />
+                              <span>Move to Bottom</span>
+                            </button>
+
+                            {/* Remove Upvote */}
+                            <div className="border-t border-white/[0.08] pt-1 mt-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuId(null);
+                                  toggleRecommend(item.id);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                              >
+                                <ArrowBigUp className="w-4 h-4 fill-rose-400/20 stroke-rose-400" />
+                                <span>Remove Upvote</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1068,33 +1101,51 @@ export default function MyRecommendations({
       <div className={activeTab === "private" ? "space-y-4" : "hidden"}>
         {myPrivateItems.length === 0 ? (
           <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
-            <Lock className="w-8 h-8 text-emerald-500/40 mx-auto" />
-            <p className="font-display text-sm font-semibold text-white">
-              Private vault is empty
-            </p>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
-              Store confidential recommendations securely encrypted with zero-knowledge AES-256 client keys.
-            </p>
+            <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mx-auto text-zinc-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-display text-sm font-semibold text-white">
+                Your private vault is empty
+              </p>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto leading-relaxed">
+                Save your guilty pleasures or private watchlist items here.
+              </p>
+            </div>
             <button
               type="button"
-              onClick={() => onOpenAddModal?.({ isPrivate: true })}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold rounded-full transition-all cursor-pointer min-h-[40px]"
+              onClick={() =>
+                onOpenAddModal?.({
+                  isPrivate: true,
+                  category: vaultCategory !== "all" ? vaultCategory : "movie",
+                })
+              }
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all active:scale-95 cursor-pointer min-h-[40px]"
             >
               <Plus className="w-4 h-4" />
-              <span>Add to Private Vault</span>
+              <span>Add Private Recommendation</span>
             </button>
           </div>
         ) : filteredPrivateItems.length === 0 ? (
           <div className="py-20 text-center bg-[#121212]/92 border border-white/[0.08] rounded-2xl p-8 space-y-4">
             <Search className="w-6 h-6 text-zinc-600 mx-auto" />
             <p className="font-display text-sm font-semibold text-white">
-              No private vault items found
+              No private recommendations found
             </p>
             <p className="text-xs text-zinc-500 max-w-sm mx-auto">
               {searchQuery?.trim()
-                ? `No private items matching "${searchQuery}".`
-                : `No private items match the selected filter.`}
+                ? `No private items matching "${searchQuery}" in this category.`
+                : `You haven't added any private recommendations in "${CATEGORIES.find((c) => c.id === vaultCategory)?.label || vaultCategory}" yet.`}
             </p>
+            {vaultCategory !== "all" && (
+              <button
+                type="button"
+                onClick={() => setVaultCategory("all")}
+                className="mt-2 px-4 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white text-xs font-semibold rounded-full transition-colors cursor-pointer min-h-[36px]"
+              >
+                View All ({myPrivateItems.length})
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -1131,10 +1182,6 @@ export default function MyRecommendations({
                           {item.category === "other" && item.metadata?.custom_category
                             ? item.metadata.custom_category
                             : CATEGORIES.find((c) => c.id === item.category)?.label || item.category}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                          <Lock className="w-3 h-3 text-emerald-400" />
-                          <span>Private Vault</span>
                         </span>
                         {item.metadata?.year && <span>{item.metadata.year}</span>}
                         {item.metadata?.author && (
@@ -1174,48 +1221,58 @@ export default function MyRecommendations({
                   </div>
 
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
-                    {/* Watched Tickbox Button (to the left of Share button) */}
-                    <button
-                      type="button"
-                      onClick={() => toggleWatched(item.id)}
-                      className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-medium transition-all active:scale-95 duration-75 cursor-pointer min-h-[40px] select-none ${
-                        isItemWatched
-                          ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
-                          : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-zinc-400 hover:text-zinc-200"
-                      }`}
-                      aria-label={isItemWatched ? "Mark as unwatched" : "Mark as watched"}
-                    >
-                      <span
-                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                    {/* Bottom Left Badge (Private Vault) */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                        <Lock className="w-3 h-3 text-emerald-400" />
+                        <span>Private Vault</span>
+                      </span>
+                    </div>
+
+                    {/* Right-aligned Actions Group: Watched, Share, 3-Dots */}
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      {/* Watched Tickbox Button (to the left of Share button) */}
+                      <button
+                        type="button"
+                        onClick={() => toggleWatched(item.id)}
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-medium transition-all active:scale-95 duration-75 cursor-pointer min-h-[40px] select-none ${
                           isItemWatched
-                            ? "bg-emerald-500 border-emerald-400 text-black"
-                            : "border-zinc-500 bg-transparent"
+                            ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
+                            : "bg-white/[0.04] hover:bg-white/[0.08] border-white/[0.1] text-zinc-400 hover:text-zinc-200"
                         }`}
+                        aria-label={isItemWatched ? "Mark as unwatched" : "Mark as watched"}
                       >
-                        {isItemWatched && <Check className="w-3 h-3 stroke-[3]" />}
-                      </span>
-                      <span className="text-[11px] font-mono hidden sm:inline">
-                        {isItemWatched ? "Watched" : "Watch"}
-                      </span>
-                    </button>
+                        <span
+                          className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                            isItemWatched
+                              ? "bg-emerald-500 border-emerald-400 text-black"
+                              : "border-zinc-500 bg-transparent"
+                          }`}
+                        >
+                          {isItemWatched && <Check className="w-3 h-3 stroke-[3]" />}
+                        </span>
+                        <span className="text-[11px] font-mono hidden sm:inline">
+                          {isItemWatched ? "Watched" : "Watch"}
+                        </span>
+                      </button>
 
-                    {/* Share Button */}
-                    <button
-                      type="button"
-                      disabled={!(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))}
-                      onClick={() => onOpenShare?.(item)}
-                      className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
-                        !(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))
-                          ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
-                          : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
-                      }`}
-                      aria-label="Share privately with a friend"
-                    >
-                      <Share2 className="w-3.5 h-3.5 text-zinc-400" />
-                      <span className="hidden sm:inline">Share</span>
-                    </button>
+                      {/* Share Button */}
+                      <button
+                        type="button"
+                        disabled={!(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))}
+                        onClick={() => onOpenShare?.(item)}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border rounded-xl min-h-[40px] ${
+                          !(item._isDecrypted || (item.title && item.title !== "[Encrypted Item]"))
+                            ? "bg-white/[0.02] text-zinc-600 border-white/[0.04] cursor-not-allowed"
+                            : "bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white border-white/[0.1] cursor-pointer"
+                        }`}
+                        aria-label="Share privately with a friend"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+                        <span className="hidden sm:inline">Share</span>
+                      </button>
 
-                    {/* 3-Dots Dropdown Menu */}
+                      {/* 3-Dots Dropdown Menu */}
                     <div className={`relative ${isMenuActive ? "z-40" : ""}`} data-card-menu>
                       <button
                         type="button"
@@ -1289,8 +1346,9 @@ export default function MyRecommendations({
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
           </div>
         )}
       </div>
