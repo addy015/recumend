@@ -1,7 +1,7 @@
 // Automated Verification Suite for Recumend Features (Features.md)
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { formatRecsAsText } from '../src/lib/exportUtils.js'
+import { formatRecsAsText, buildRecsPdfBinary } from '../src/lib/exportUtils.js'
 
 console.log('🧪 Starting Recumend Features Test Suite...\n')
 
@@ -82,6 +82,15 @@ assert.ok(textExport.includes('Severance'), 'Item 1 title must be formatted')
 assert.ok(textExport.includes('TV Shows/Series'), 'Category label must be mapped')
 assert.ok(textExport.includes('Apple TV+'), 'Platform/Source must be formatted')
 assert.ok(textExport.includes('Masterpiece psychological workplace mystery'), 'Note must be formatted')
+
+const pdfExport = buildRecsPdfBinary({
+  userProfile: mockUserProfile,
+  items: mockRecs
+})
+assert.ok(pdfExport.startsWith('%PDF-1.4'), 'PDF must start with %PDF-1.4')
+assert.ok(pdfExport.includes('RECUMEND'), 'PDF must contain brand title')
+assert.ok(pdfExport.includes('John Doe'), 'PDF must contain display name')
+assert.ok(pdfExport.trim().endsWith('%%EOF'), 'PDF must end with %%EOF')
 
 console.log('  ✅ Passed: Export strictly follows specified header and columnar format.\n')
 

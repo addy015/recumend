@@ -344,10 +344,14 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
               <div className="absolute right-0 mt-2 w-48 bg-[#141414] border border-white/[0.12] p-1.5 shadow-2xl rounded-2xl z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-100">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDownloadMenuOpen(false)
-                    printRecsAsPdf({ userProfile: profile, items: userItems })
-                    onToast?.({ message: `Opened PDF print sheet for ${userItems.length} recommendations.` })
+                    const res = await printRecsAsPdf({ userProfile: profile, items: userItems })
+                    onToast?.({
+                      message: res?.savedToDocuments
+                        ? `Downloaded ${res.filename} to Documents`
+                        : `Downloaded ${userItems.length} recommendations as .pdf`
+                    })
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer"
                 >
@@ -357,10 +361,14 @@ export default function UserProfileView({ username, onBack, onSelectUser, onOpen
 
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     setIsDownloadMenuOpen(false)
-                    downloadRecsText({ userProfile: profile, items: userItems })
-                    onToast?.({ message: `Downloaded ${userItems.length} recommendations as .txt` })
+                    const res = await downloadRecsText({ userProfile: profile, items: userItems })
+                    onToast?.({
+                      message: res?.savedToDocuments
+                        ? `Downloaded ${res.filename} to Documents`
+                        : `Downloaded ${userItems.length} recommendations as .txt`
+                    })
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer"
                 >

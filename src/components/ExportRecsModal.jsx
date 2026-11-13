@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { X, Download, FileText, ShieldCheck } from 'lucide-react'
 import { downloadRecsText, printRecsAsPdf } from '../lib/exportUtils'
+import { registerBackHandler } from '../lib/backButtonHandler'
 
 export default function ExportRecsModal({
   isOpen,
@@ -18,14 +19,21 @@ export default function ExportRecsModal({
 
   const backdropMouseDownRef = useRef(false)
 
-  // Escape key handler
+  // Escape key & Android hardware back button handler
   useEffect(() => {
     if (!isOpen) return
+    const unregister = registerBackHandler(() => {
+      onClose()
+      return true
+    })
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      unregister()
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [isOpen, onClose])
 
   if (!isOpen) return null
@@ -36,7 +44,7 @@ export default function ExportRecsModal({
     (includeUpvoted ? upvotedItems.length : 0) +
     (includePrivate ? myPrivateItems.length : 0)
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (selectedCount === 0) {
       onToast?.({ message: 'Please select at least one group to export.', type: 'error' })
       return
@@ -55,11 +63,19 @@ export default function ExportRecsModal({
     }
 
     if (format === 'txt') {
-      downloadRecsText({ userProfile, items: exportPool })
-      onToast?.({ message: `Exported ${exportPool.length} recommendations as .txt` })
+      const res = await downloadRecsText({ userProfile, items: exportPool })
+      onToast?.({
+        message: res?.savedToDocuments
+          ? `Downloaded ${res.filename} to Documents`
+          : `Downloaded ${exportPool.length} recommendations as .txt`
+      })
     } else {
-      printRecsAsPdf({ userProfile, items: exportPool })
-      onToast?.({ message: `Opened printable sheet for ${exportPool.length} recommendations.` })
+      const res = await printRecsAsPdf({ userProfile, items: exportPool })
+      onToast?.({
+        message: res?.savedToDocuments
+          ? `Downloaded ${res.filename} to Documents`
+          : `Downloaded ${exportPool.length} recommendations as .pdf`
+      })
     }
 
     onClose()

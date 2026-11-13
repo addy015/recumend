@@ -19,6 +19,9 @@ build/
 !.env.example
 *.pem
 *.key
+*.jks
+*.keystore
+*.p12
 
 # Logs & Diagnostics
 logs/

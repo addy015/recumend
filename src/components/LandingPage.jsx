@@ -72,7 +72,7 @@ export default function LandingPage({
   return (
     <div className="flex-1 flex flex-col">
       {/* Top Header Bar */}
-      <header className="shrink-0 border-b border-white/[0.08] bg-[#08090C]/60 backdrop-blur-md sticky top-0 z-40">
+      <header className="shrink-0 border-b border-white/[0.08] bg-[#08090C]/80 backdrop-blur-md sticky top-0 z-40 pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo with Ruby "REC" Dot */}
           <div

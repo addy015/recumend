@@ -13,15 +13,28 @@
     "test:shares": "node tests/shares.test.js",
     "test:features": "node tests/features.test.js",
     "test:persistence": "node tests/persistence.test.js",
-    "test": "npm run test:security && npm run test:vault && npm run test:shares && npm run test:features && npm run test:persistence"
+    "test:capacitor": "node tests/capacitor.test.js",
+    "test": "npm run test:security && npm run test:vault && npm run test:shares && npm run test:features && npm run test:persistence && npm run test:capacitor",
+    "cap:sync": "vite build && cap sync android",
+    "cap:open": "cap open android",
+    "cap:run": "cap run android",
+    "build:apk": "vite build && cap sync android && cd android && gradlew assembleDebug && cd .."
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/status-bar": "^8.0.4",
     "@supabase/supabase-js": "^2.117.2",
     "lucide-react": "^1.51.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",

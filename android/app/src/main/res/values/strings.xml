@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Recumend</string>
+    <string name="title_activity_main">Recumend</string>
+    <string name="package_name">com.recumend.app</string>
+    <string name="custom_url_scheme">recumend</string>
+</resources>

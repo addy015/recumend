@@ -1,4 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
+import { StatusBar, Style } from '@capacitor/status-bar'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { clearCachedVaultKeys } from '../lib/googleDriveVault'
 
@@ -288,6 +292,75 @@ export function AuthProvider({ children }) {
     return () => subscription?.unsubscribe?.()
   }, [fetchProfile])
 
+  // Native mobile setup: Status bar and OAuth deep linking
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    // Style native status bar with dark aesthetic and prevent webview from underlapping
+    StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {})
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: '#08090C' }).catch(() => {})
+
+    // Listen for custom scheme redirects (recumend://auth-callback)
+    let appUrlListener = null
+    async function setupAppUrlListener() {
+      try {
+        appUrlListener = await App.addListener('appUrlOpen', async ({ url }) => {
+          if (!url || !url.includes('auth-callback')) return
+
+          // Close external in-app browser tab
+          await Browser.close().catch(() => {})
+
+          try {
+            // Normalize custom scheme to standard URL for robust parameter parsing
+            const normalized = url.replace(/^recumend:\/\//, 'https://recumend.app/')
+            const parsedUrl = new URL(normalized)
+
+            // 1. Handle PKCE authorization code exchange
+            const code = parsedUrl.searchParams.get('code')
+            if (code) {
+              const { error } = await supabase.auth.exchangeCodeForSession(code)
+              if (error) throw error
+            } else {
+              // 2. Handle implicit access_token and refresh_token in URL hash
+              const hash = parsedUrl.hash ? parsedUrl.hash.replace(/^#/, '') : ''
+              const hashParams = new URLSearchParams(hash)
+              const accessToken = hashParams.get('access_token') || parsedUrl.searchParams.get('access_token')
+              const refreshToken = hashParams.get('refresh_token') || parsedUrl.searchParams.get('refresh_token')
+
+              if (accessToken && refreshToken) {
+                const { error } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken
+                })
+                if (error) throw error
+              }
+            }
+
+            // Navigate to /feed after session set
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(null, '', '/feed')
+              window.dispatchEvent(new Event('popstate'))
+            }
+          } catch (err) {
+            console.error('Deep link auth exchange failed:', err)
+            setAuthError(err.message || 'Authentication exchange failed.')
+          }
+        })
+      } catch (listenerErr) {
+        console.warn('Failed to register appUrlOpen listener:', listenerErr)
+      }
+    }
+
+    setupAppUrlListener()
+
+    return () => {
+      if (appUrlListener && typeof appUrlListener.remove === 'function') {
+        appUrlListener.remove()
+      }
+    }
+  }, [])
+
   // Sign in using Google OAuth (or set demo user in offline mode)
   async function signInWithGoogle() {
     setIsAuthenticating(true)
@@ -317,22 +390,40 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      // Trigger standard Google OAuth flow with redirect to /feed
-      const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/feed` : ''
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUri
+      if (Capacitor.isNativePlatform()) {
+        // Mobile flow: trigger OAuth with custom scheme redirect and open in system browser
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: 'recumend://auth-callback',
+            skipBrowserRedirect: true
+          }
+        })
+
+        if (error) throw error
+
+        if (data?.url) {
+          await Browser.open({ url: data.url, windowName: '_system' })
         }
-      })
+        return { success: true, data }
+      } else {
+        // Web flow: standard Google OAuth redirect to /feed
+        const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/feed` : ''
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: redirectUri
+          }
+        })
 
-      if (error) throw error
+        if (error) throw error
 
-      // Direct fallback if browser did not auto navigate
-      if (data?.url && typeof window !== 'undefined') {
-        window.location.assign(data.url)
+        // Direct fallback if browser did not auto navigate
+        if (data?.url && typeof window !== 'undefined') {
+          window.location.assign(data.url)
+        }
+        return { success: true, data }
       }
-      return { success: true, data }
     } catch (err) {
       console.error('Google OAuth sign-in failed:', err)
       const message = err.message || 'Google sign-in could not be initiated.'

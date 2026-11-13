@@ -132,7 +132,7 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#08090C]/60 backdrop-blur-md border-b border-white/[0.08]">
+      <header className="sticky top-0 z-30 bg-[#08090C]/80 backdrop-blur-md border-b border-white/[0.08] pt-[env(safe-area-inset-top,0px)]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
           {/* Brand */}
           <div

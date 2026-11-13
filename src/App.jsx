@@ -15,6 +15,7 @@ import UserProfileView from './components/UserProfileView'
 import LegalView from './components/LegalView'
 import AtmosphereBackground from './components/AtmosphereBackground'
 import { TrendingUp, Bookmark, Send, X } from 'lucide-react'
+import { initHardwareBackButton, registerBackHandler } from './lib/backButtonHandler'
 
 // Lightweight SPA routing helper
 function navigate(url) {
@@ -197,6 +198,52 @@ function MainContent() {
     setSharingItem(item)
     setIsShareModalOpen(true)
   }, [user, signInWithGoogle])
+
+  // Native Android hardware back-button listener
+  useEffect(() => {
+    return initHardwareBackButton({
+      onBack: () => {
+        // If in Leaderboard (feed) and on a subtab ('my-recs' or 'shared'), go back to Leaderboard ('feed')
+        if (route.page === 'feed' && activeTab !== 'feed') {
+          setActiveTab('feed')
+          navigate('/feed')
+          return true
+        }
+        // If on Leaderboard ('feed'), go back to Landing page ('/')
+        if (route.page === 'feed') {
+          navigate('/')
+          return true
+        }
+        // If on Profile or Privacy view, return to Landing page ('/')
+        if (route.page === 'profile' || route.page === 'privacy') {
+          navigate('/')
+          return true
+        }
+        // If on Landing page ('/'), return false so App.exitApp() minimizes/exits the app
+        return false
+      },
+      onNavigateHome: () => {
+        navigate('/')
+      }
+    })
+  }, [route.page, activeTab])
+
+  // Register open modal dismissals with back-button stack (LIFO)
+  useEffect(() => {
+    if (isAddModalOpen) return registerBackHandler(() => setIsAddModalOpen(false))
+  }, [isAddModalOpen])
+
+  useEffect(() => {
+    if (isSettingsModalOpen) return registerBackHandler(() => setIsSettingsModalOpen(false))
+  }, [isSettingsModalOpen])
+
+  useEffect(() => {
+    if (isShareModalOpen) return registerBackHandler(() => setIsShareModalOpen(false))
+  }, [isShareModalOpen])
+
+  useEffect(() => {
+    if (isFriendsModalOpen) return registerBackHandler(() => setIsFriendsModalOpen(false))
+  }, [isFriendsModalOpen])
 
   // AtmosphereBackground stays permanently mounted across ALL routes
   return (
