@@ -156,6 +156,23 @@ function MainContent() {
     }
   }, [])
 
+  // Enforce authentication for private tabs: 'my-recs' and 'shared'
+  useEffect(() => {
+    if (loading) return
+
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    const isPrivateHash = hash === '#/my-recs' || hash === '#my-recs' || hash === '#/shared' || hash === '#shared'
+    const isPrivateTab = activeTab === 'my-recs' || activeTab === 'shared'
+
+    if (!user && (isPrivateHash || isPrivateTab)) {
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/feed')
+      }
+      setActiveTab('feed')
+      signInWithGoogle()
+    }
+  }, [user, loading, activeTab, signInWithGoogle])
+
   // Open add modal or prompt Google login if guest
   const handleOpenAddModal = (options = {}) => {
     if (!user) {
@@ -201,7 +218,14 @@ function MainContent() {
               navigate(`/u/${profile.username}`)
             }
           }}
-          onOpenMyRecs={() => navigate('/feed#/my-recs')}
+          onOpenMyRecs={() => {
+            if (!user) {
+              signInWithGoogle()
+              return
+            }
+            navigate('/feed#/my-recs')
+            setActiveTab('my-recs')
+          }}
           onOpenFriendsModal={() => {
             if (!user) {
               signInWithGoogle()
@@ -215,6 +239,7 @@ function MainContent() {
               return
             }
             navigate('/feed#/shared')
+            setActiveTab('shared')
           }}
           isAuthenticating={isAuthenticating}
           loading={loading}
@@ -228,8 +253,16 @@ function MainContent() {
             activeTab={activeTab}
             setActiveTab={(tab) => {
               if (tab === 'my-recs') {
+                if (!user) {
+                  signInWithGoogle()
+                  return
+                }
                 navigate('/feed#/my-recs')
               } else if (tab === 'shared') {
+                if (!user) {
+                  signInWithGoogle()
+                  return
+                }
                 navigate('/feed#/shared')
               } else {
                 navigate('/feed')
@@ -356,30 +389,34 @@ function MainContent() {
             </div>
 
             <div className={activeTab === 'my-recs' ? 'block' : 'hidden'}>
-              <MyRecommendations
-                onOpenAddModal={handleOpenAddModal}
-                searchQuery={searchQuery}
-                onOpenShare={handleOpenShare}
-                onSelectUser={(creator) => {
-                  if (creator?.username) {
-                    navigate(`/u/${creator.username}`)
-                  }
-                }}
-                onToast={showToast}
-              />
+              {user && (
+                <MyRecommendations
+                  onOpenAddModal={handleOpenAddModal}
+                  searchQuery={searchQuery}
+                  onOpenShare={handleOpenShare}
+                  onSelectUser={(creator) => {
+                    if (creator?.username) {
+                      navigate(`/u/${creator.username}`)
+                    }
+                  }}
+                  onToast={showToast}
+                />
+              )}
             </div>
 
             <div className={activeTab === 'shared' ? 'block' : 'hidden'}>
-              <SharedWithMe
-                isActive={activeTab === 'shared'}
-                searchQuery={searchQuery}
-                onToast={showToast}
-                onSelectUser={(creator) => {
-                  if (creator?.username) {
-                    navigate(`/u/${creator.username}`)
-                  }
-                }}
-              />
+              {user && (
+                <SharedWithMe
+                  isActive={activeTab === 'shared'}
+                  searchQuery={searchQuery}
+                  onToast={showToast}
+                  onSelectUser={(creator) => {
+                    if (creator?.username) {
+                      navigate(`/u/${creator.username}`)
+                    }
+                  }}
+                />
+              )}
             </div>
           </>
         )}

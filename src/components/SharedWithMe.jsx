@@ -300,6 +300,11 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
 
   const isLoading = activeSubTab === 'with-me' ? loadingShared : loadingSent
 
+  // Require authentication to view shared items
+  if (!user) {
+    return null
+  }
+
   return (
     <div className="space-y-6">
       {/* Sub-navigation Switch: With Me vs By Me */}

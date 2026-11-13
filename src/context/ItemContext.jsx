@@ -11,6 +11,29 @@ const ItemContext = createContext(null)
 const LOCAL_ITEMS_KEY = 'recumend_items_data'
 const LOCAL_RECS_KEY = 'recumend_user_recs'
 const LOCAL_WATCHED_KEY = 'recumend_watched_items'
+const LOCAL_ORDER_KEY = 'recumend_watch_order'
+
+function getInitialWatched(userId) {
+  if (typeof window === 'undefined') return new Set()
+  const key = userId || 'guest'
+  try {
+    const raw = localStorage.getItem(`${LOCAL_WATCHED_KEY}_${key}`)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+function getInitialOrders(userId) {
+  if (typeof window === 'undefined') return { created: [], upvoted: [], private: [] }
+  const key = userId || 'guest'
+  try {
+    const raw = localStorage.getItem(`${LOCAL_ORDER_KEY}_${key}`)
+    return raw ? JSON.parse(raw) : { created: [], upvoted: [], private: [] }
+  } catch {
+    return { created: [], upvoted: [], private: [] }
+  }
+}
 
 // Default seed recommendations shown in demo mode
 const INITIAL_ITEMS = [
@@ -87,46 +110,157 @@ export function ItemProvider({ children }) {
   const { user, profile, providerToken, savePublicKeyToProfile } = useAuth()
   const [items, setItems] = useState([])
   const [userRecs, setUserRecs] = useState(new Set())
-  const [watchedItemIds, setWatchedItemIds] = useState(new Set())
+  const [watchedItemIds, setWatchedItemIds] = useState(() => getInitialWatched(user?.id))
+  const [watchOrders, setWatchOrders] = useState(() => getInitialOrders(user?.id))
   const [loading, setLoading] = useState(true)
   const [vaultKeys, setVaultKeys] = useState(null)
   const [isVaultSyncing, setIsVaultSyncing] = useState(false)
   const [vaultError, setVaultError] = useState(null)
   const votingInProgress = useRef(new Set())
-  const isInitialWatchedMount = useRef(true)
+  const prefSyncTimeoutRef = useRef(null)
+  const latestPreferencesRef = useRef({
+    watched: getInitialWatched(user?.id),
+    orders: getInitialOrders(user?.id)
+  })
 
-  // Load user's watched items from local cache
-  useEffect(() => {
-    isInitialWatchedMount.current = true
-    const userId = user?.id || 'guest'
-    try {
-      const raw = localStorage.getItem(`${LOCAL_WATCHED_KEY}_${userId}`)
-      if (raw) {
-        setWatchedItemIds(new Set(JSON.parse(raw)))
-      } else {
-        setWatchedItemIds(new Set())
+  // Debounced sync function to push preferences to Supabase
+  const syncCloudPreferences = useCallback((watchedSet, ordersObj) => {
+    if (!user?.id || !isSupabaseConfigured) return
+    if (prefSyncTimeoutRef.current) clearTimeout(prefSyncTimeoutRef.current)
+
+    prefSyncTimeoutRef.current = setTimeout(async () => {
+      try {
+        await supabase
+          .from('user_preferences')
+          .upsert({
+            user_id: user.id,
+            watched_items: [...watchedSet],
+            watch_orders: ordersObj,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+      } catch (err) {
+        console.warn('Preferences cloud sync notice:', err)
       }
-    } catch (err) {
-      console.warn('Failed to parse watched items cache:', err)
-      setWatchedItemIds(new Set())
+    }, 500)
+  }, [user?.id])
+
+  // Hydrate preferences on mount and on user change
+  useEffect(() => {
+    const userId = user?.id || 'guest'
+    const localWatched = getInitialWatched(userId)
+    const localOrders = getInitialOrders(userId)
+
+    setWatchedItemIds(localWatched)
+    setWatchOrders(localOrders)
+    latestPreferencesRef.current = { watched: localWatched, orders: localOrders }
+
+    if (!user?.id || !isSupabaseConfigured) return
+
+    let isMounted = true
+
+    async function hydrateCloudPreferences() {
+      try {
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('watched_items, watch_orders')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (error) {
+          console.warn('Preferences fetch notice:', error.message)
+          return
+        }
+
+        if (!isMounted) return
+
+        if (data) {
+          const cloudWatched = Array.isArray(data.watched_items) ? data.watched_items : []
+          const cloudOrders = (data.watch_orders && typeof data.watch_orders === 'object') ? data.watch_orders : {}
+
+          // Union merge local + cloud watched items
+          const mergedWatched = new Set([...cloudWatched, ...localWatched])
+          const mergedOrders = {
+            created: Array.isArray(cloudOrders.created) && cloudOrders.created.length > 0 ? cloudOrders.created : (localOrders.created || []),
+            upvoted: Array.isArray(cloudOrders.upvoted) && cloudOrders.upvoted.length > 0 ? cloudOrders.upvoted : (localOrders.upvoted || []),
+            private: Array.isArray(cloudOrders.private) && cloudOrders.private.length > 0 ? cloudOrders.private : (localOrders.private || []),
+          }
+
+          setWatchedItemIds(mergedWatched)
+          setWatchOrders(mergedOrders)
+          latestPreferencesRef.current = { watched: mergedWatched, orders: mergedOrders }
+
+          try {
+            localStorage.setItem(`${LOCAL_WATCHED_KEY}_${user.id}`, JSON.stringify([...mergedWatched]))
+            localStorage.setItem(`${LOCAL_ORDER_KEY}_${user.id}`, JSON.stringify(mergedOrders))
+          } catch {}
+
+          // If local had new items not yet in cloud, sync merged version back
+          if (mergedWatched.size > cloudWatched.length) {
+            syncCloudPreferences(mergedWatched, mergedOrders)
+          }
+        } else {
+          // If no row exists yet, initialize with current preferences
+          if (localWatched.size > 0 || (localOrders.created?.length || localOrders.upvoted?.length || localOrders.private?.length)) {
+            syncCloudPreferences(localWatched, localOrders)
+          }
+        }
+      } catch (err) {
+        console.warn('Preferences hydration error:', err)
+      }
+    }
+
+    hydrateCloudPreferences()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, syncCloudPreferences])
+
+  // Live cross-device realtime subscription
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured) return
+
+    const channel = supabase
+      .channel(`user_preferences:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_preferences',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.new) {
+            const newWatched = Array.isArray(payload.new.watched_items) ? payload.new.watched_items : []
+            const newOrders = (payload.new.watch_orders && typeof payload.new.watch_orders === 'object') ? payload.new.watch_orders : {}
+
+            const nextWatched = new Set(newWatched)
+            const nextOrders = {
+              created: Array.isArray(newOrders.created) ? newOrders.created : [],
+              upvoted: Array.isArray(newOrders.upvoted) ? newOrders.upvoted : [],
+              private: Array.isArray(newOrders.private) ? newOrders.private : [],
+            }
+
+            setWatchedItemIds(nextWatched)
+            setWatchOrders(nextOrders)
+            latestPreferencesRef.current = { watched: nextWatched, orders: nextOrders }
+
+            try {
+              localStorage.setItem(`${LOCAL_WATCHED_KEY}_${user.id}`, JSON.stringify([...nextWatched]))
+              localStorage.setItem(`${LOCAL_ORDER_KEY}_${user.id}`, JSON.stringify(nextOrders))
+            } catch {}
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [user?.id])
 
-  // Persist watched items changes asynchronously to localStorage outside the render loop
-  useEffect(() => {
-    if (isInitialWatchedMount.current) {
-      isInitialWatchedMount.current = false
-      return
-    }
-    const userId = user?.id || 'guest'
-    try {
-      localStorage.setItem(`${LOCAL_WATCHED_KEY}_${userId}`, JSON.stringify([...watchedItemIds]))
-    } catch {
-      // ignore
-    }
-  }, [watchedItemIds, user?.id])
-
-  // Toggle watched status for an item (instant pure update, zero disk I/O lag)
+  // Toggle watched status for an item (instant pure update, zero disk I/O lag + debounced cloud sync)
   const toggleWatched = useCallback((itemId) => {
     if (!itemId) return
     setWatchedItemIds((prev) => {
@@ -136,13 +270,50 @@ export function ItemProvider({ children }) {
       } else {
         next.add(itemId)
       }
+
+      const userId = user?.id || 'guest'
+      try {
+        localStorage.setItem(`${LOCAL_WATCHED_KEY}_${userId}`, JSON.stringify([...next]))
+      } catch {}
+
+      latestPreferencesRef.current = {
+        ...latestPreferencesRef.current,
+        watched: next
+      }
+
+      if (user?.id && isSupabaseConfigured) {
+        syncCloudPreferences(next, latestPreferencesRef.current.orders)
+      }
+
       return next
     })
-  }, [])
+  }, [user?.id, syncCloudPreferences])
 
   const isWatched = useCallback((itemId) => {
     return watchedItemIds.has(itemId)
   }, [watchedItemIds])
+
+  // Save watch order per tab (instant pure update + debounced cloud sync)
+  const saveWatchOrder = useCallback((tabKey, newOrderArray) => {
+    const userId = user?.id || 'guest'
+    setWatchOrders((prev) => {
+      const next = { ...prev, [tabKey]: newOrderArray }
+      try {
+        localStorage.setItem(`${LOCAL_ORDER_KEY}_${userId}`, JSON.stringify(next))
+      } catch {}
+
+      latestPreferencesRef.current = {
+        ...latestPreferencesRef.current,
+        orders: next
+      }
+
+      if (user?.id && isSupabaseConfigured) {
+        syncCloudPreferences(latestPreferencesRef.current.watched, next)
+      }
+
+      return next
+    })
+  }, [user?.id, syncCloudPreferences])
 
   // Synchronize unified encryption vault (AES-256 for personal vault + ECDH P-256 for peer sharing)
   useEffect(() => {
@@ -1280,6 +1451,9 @@ export function ItemProvider({ children }) {
       watchedItemIds,
       toggleWatched,
       isWatched,
+      watchOrders,
+      saveWatchOrder,
+      saveOrder: saveWatchOrder,
       loading,
       vaultKeys,
       isVaultSyncing,

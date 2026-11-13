@@ -12,7 +12,8 @@
     "test:vault": "node tests/vault.test.js",
     "test:shares": "node tests/shares.test.js",
     "test:features": "node tests/features.test.js",
-    "test": "npm run test:security && npm run test:vault && npm run test:shares && npm run test:features"
+    "test:persistence": "node tests/persistence.test.js",
+    "test": "npm run test:security && npm run test:vault && npm run test:shares && npm run test:features && npm run test:persistence"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

@@ -145,6 +145,10 @@ export default function LandingPage({
                       type="button"
                       onClick={() => {
                         setDropdownOpen(false);
+                        if (!user) {
+                          onGoogleSignIn?.();
+                          return;
+                        }
                         onOpenMyRecs?.();
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[40px]"
@@ -157,6 +161,10 @@ export default function LandingPage({
                       type="button"
                       onClick={() => {
                         setDropdownOpen(false);
+                        if (!user) {
+                          onGoogleSignIn?.();
+                          return;
+                        }
                         onOpenShared?.();
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[40px]"
@@ -293,7 +301,14 @@ export default function LandingPage({
 
                 <button
                   type="button"
-                  onClick={onOpenMyRecs || onBegin}
+                  onClick={() => {
+                    if (!user) {
+                      onGoogleSignIn?.();
+                      return;
+                    }
+                    if (onOpenMyRecs) onOpenMyRecs();
+                    else onBegin?.();
+                  }}
                   className="inline-flex items-center justify-center gap-2 bg-transparent hover:bg-white/[0.06] border border-white/20 text-zinc-300 hover:text-white font-medium text-sm sm:text-base px-7 py-3.5 rounded-full transition-all cursor-pointer min-h-[48px] active:scale-[0.98]"
                 >
                   <Bookmark className="w-4 h-4 text-zinc-400" />

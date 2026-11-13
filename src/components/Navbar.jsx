@@ -360,6 +360,10 @@ export default function Navbar({
                           onClick={() => {
                             setDropdownOpen(false);
                             signOut();
+                            if (setActiveTab) setActiveTab("feed");
+                            if (typeof window !== "undefined") {
+                              window.history.replaceState(null, "", "/feed");
+                            }
                           }}
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-400 hover:bg-rose-500/10 rounded-xl text-left transition-colors min-h-[40px]"
                         >

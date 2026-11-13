@@ -28,8 +28,6 @@ import CategoryFilter from "./CategoryFilter";
 import EditRecommendationModal from "./EditRecommendationModal";
 import ExportRecsModal from "./ExportRecsModal";
 
-const LOCAL_ORDER_KEY = "recumend_watch_order";
-
 // User dashboard for managing personal created recommendations, private vault items, and endorsements
 export default function MyRecommendations({
   onOpenAddModal,
@@ -49,7 +47,9 @@ export default function MyRecommendations({
     vaultError,
     refreshPrivateItems,
     toggleWatched,
-    isWatched
+    isWatched,
+    watchOrders = { created: [], upvoted: [], private: [] },
+    saveOrder
   } = useItems();
 
   // Active sub-tab ('created' | 'upvoted' | 'private')
@@ -64,17 +64,6 @@ export default function MyRecommendations({
   // Export recommendations modal
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  // Watch order state per sub-tab (Created, Upvoted, Private)
-  const [watchOrders, setWatchOrders] = useState(() => {
-    const userKey = user?.id || "guest";
-    try {
-      const raw = localStorage.getItem(`${LOCAL_ORDER_KEY}_${userKey}`);
-      return raw ? JSON.parse(raw) : { created: [], upvoted: [], private: [] };
-    } catch {
-      return { created: [], upvoted: [], private: [] };
-    }
-  });
-
   // Drag and drop state
   const [draggedItemId, setDraggedItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
@@ -87,33 +76,6 @@ export default function MyRecommendations({
   const [errorMessage, setErrorMessage] = useState(null);
   const [activeMenuId, setActiveMenuId] = useState(null);
   const backdropMouseDownRef = useRef(false);
-
-  // Sync watch order on user change
-  useEffect(() => {
-    const userKey = user?.id || "guest";
-    try {
-      const raw = localStorage.getItem(`${LOCAL_ORDER_KEY}_${userKey}`);
-      if (raw) {
-        setWatchOrders(JSON.parse(raw));
-      }
-    } catch {
-      // ignore
-    }
-  }, [user?.id]);
-
-  // Save new watch order
-  const saveOrder = useCallback((tabKey, newOrderArray) => {
-    const userKey = user?.id || "guest";
-    setWatchOrders((prev) => {
-      const next = { ...prev, [tabKey]: newOrderArray };
-      try {
-        localStorage.setItem(`${LOCAL_ORDER_KEY}_${userKey}`, JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, [user?.id]);
 
   // Sorter: Newly added items (not yet in saved watch order) ALWAYS land at the very top (sorted newest first),
   // followed by custom watch order items (persisting user's drag / move positions).
@@ -188,6 +150,87 @@ export default function MyRecommendations({
     onToast?.({ message: "Moved to bottom of your watch order" });
   };
 
+  // Auto-scroll buffer state for smooth drag-and-drop
+  const scrollAnimRef = useRef(null);
+  const scrollSpeedRef = useRef(0);
+
+  const stopAutoScroll = useCallback(() => {
+    scrollSpeedRef.current = 0;
+    if (scrollAnimRef.current) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+    }
+  }, []);
+
+  const startAutoScrollLoop = useCallback(() => {
+    if (scrollAnimRef.current) return;
+    const loop = () => {
+      if (scrollSpeedRef.current !== 0) {
+        window.scrollBy(0, scrollSpeedRef.current);
+        scrollAnimRef.current = requestAnimationFrame(loop);
+      } else {
+        scrollAnimRef.current = null;
+      }
+    };
+    scrollAnimRef.current = requestAnimationFrame(loop);
+  }, []);
+
+  const handleAutoScroll = useCallback(
+    (clientY) => {
+      if (typeof window === "undefined" || clientY == null) return;
+      const viewportHeight = window.innerHeight;
+      const THRESHOLD = 150; // 150px buffer zone from top and bottom
+      const MAX_SPEED = 22; // Maximum scroll speed per frame
+
+      if (clientY < THRESHOLD) {
+        // Upper zone: scroll smoothly up
+        const distance = Math.max(0, clientY);
+        const intensity = (THRESHOLD - distance) / THRESHOLD;
+        scrollSpeedRef.current = -Math.max(4, Math.ceil(intensity * MAX_SPEED));
+        startAutoScrollLoop();
+      } else if (clientY > viewportHeight - THRESHOLD) {
+        // Lower zone: scroll smoothly down
+        const distance = Math.max(0, viewportHeight - clientY);
+        const intensity = (THRESHOLD - distance) / THRESHOLD;
+        scrollSpeedRef.current = Math.max(4, Math.ceil(intensity * MAX_SPEED));
+        startAutoScrollLoop();
+      } else {
+        // Dead zone in middle: stop scrolling
+        stopAutoScroll();
+      }
+    },
+    [startAutoScrollLoop, stopAutoScroll]
+  );
+
+  // Global window listener while dragging an item
+  useEffect(() => {
+    if (!draggedItemId) {
+      stopAutoScroll();
+      return;
+    }
+
+    const onWindowDragOver = (e) => {
+      if (e.clientY != null) {
+        handleAutoScroll(e.clientY);
+      }
+    };
+
+    const onDragStop = () => {
+      stopAutoScroll();
+    };
+
+    window.addEventListener("dragover", onWindowDragOver, { passive: true });
+    window.addEventListener("dragend", onDragStop);
+    window.addEventListener("drop", onDragStop);
+
+    return () => {
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("dragend", onDragStop);
+      window.removeEventListener("drop", onDragStop);
+      stopAutoScroll();
+    };
+  }, [draggedItemId, handleAutoScroll, stopAutoScroll]);
+
   // Drag handlers
   const handleDragStart = (e, itemId) => {
     setDraggedItemId(itemId);
@@ -199,10 +242,12 @@ export default function MyRecommendations({
     if (dragOverItemId !== itemId) {
       setDragOverItemId(itemId);
     }
+    handleAutoScroll(e.clientY);
   };
 
   const handleDrop = (e, tabKey, targetItemId) => {
     e.preventDefault();
+    stopAutoScroll();
     if (!draggedItemId || draggedItemId === targetItemId) {
       setDraggedItemId(null);
       setDragOverItemId(null);
@@ -224,6 +269,7 @@ export default function MyRecommendations({
   };
 
   const handleDragEnd = () => {
+    stopAutoScroll();
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
@@ -392,6 +438,11 @@ export default function MyRecommendations({
       setErrorMessage(res.error);
     }
   };
+
+  // Require authentication to view vault & curation
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="space-y-6">
