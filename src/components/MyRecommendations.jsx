@@ -68,6 +68,25 @@ export default function MyRecommendations({
   const [draggedItemId, setDraggedItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
 
+  // Touch device detection to isolate mobile app from OS-level drag gestures (Origin Island / floating windows)
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsTouchDevice(
+        "ontouchstart" in window ||
+        navigator.maxTouchPoints > 0 ||
+        window.matchMedia("(pointer: coarse)").matches
+      );
+    }
+  }, []);
+
+  const touchStateRef = useRef({
+    active: false,
+    tabKey: null,
+    draggedId: null,
+    overId: null,
+  });
+
   const [editingItem, setEditingItem] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState(null);
@@ -273,6 +292,90 @@ export default function MyRecommendations({
     setDraggedItemId(null);
     setDragOverItemId(null);
   };
+
+  // Touch Drag-and-Drop handlers for Mobile / Capacitor App:
+  // Runs purely within DOM / JavaScript touch events, keeping the gesture isolated from Android's
+  // View.startDragAndDrop system API to prevent Origin Island / Floating Mini-Window tray collisions.
+  const handleTouchDragStart = (e, itemId, tabKey) => {
+    if (searchQuery?.trim()) return;
+    touchStateRef.current = {
+      active: true,
+      tabKey,
+      draggedId: itemId,
+      overId: itemId,
+    };
+    setDraggedItemId(itemId);
+    setDragOverItemId(itemId);
+  };
+
+  useEffect(() => {
+    const onWindowTouchMove = (e) => {
+      if (!touchStateRef.current.active) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      // Prevent native viewport scrolling while intentionally reordering via handle
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+
+      // Safe clamp: keeps coordinates at least 75px away from status bar / camera notch / dynamic island
+      const safeY = Math.max(75, Math.min(window.innerHeight - 75, touch.clientY));
+      handleAutoScroll(safeY);
+
+      // Hit-test target card
+      const el = document.elementFromPoint(touch.clientX, safeY);
+      const cardEl = el?.closest?.("[data-rec-id]");
+      if (cardEl) {
+        const targetId = cardEl.getAttribute("data-rec-id");
+        if (targetId && targetId !== touchStateRef.current.overId) {
+          touchStateRef.current.overId = targetId;
+          setDragOverItemId(targetId);
+        }
+      }
+    };
+
+    const onWindowTouchEnd = () => {
+      if (!touchStateRef.current.active) return;
+      stopAutoScroll();
+
+      const { tabKey, draggedId, overId } = touchStateRef.current;
+      if (tabKey && draggedId && overId && draggedId !== overId) {
+        const effectiveIds = getEffectiveList(tabKey).map((it) => it.id);
+        const sourceIdx = effectiveIds.indexOf(draggedId);
+        const targetIdx = effectiveIds.indexOf(overId);
+
+        if (sourceIdx !== -1 && targetIdx !== -1) {
+          effectiveIds.splice(sourceIdx, 1);
+          effectiveIds.splice(targetIdx, 0, draggedId);
+          saveOrder(tabKey, effectiveIds);
+          onToast?.({ message: "Watch order updated" });
+        }
+      }
+
+      touchStateRef.current = { active: false, tabKey: null, draggedId: null, overId: null };
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+    };
+
+    const onWindowTouchCancel = () => {
+      if (!touchStateRef.current.active) return;
+      stopAutoScroll();
+      touchStateRef.current = { active: false, tabKey: null, draggedId: null, overId: null };
+      setDraggedItemId(null);
+      setDragOverItemId(null);
+    };
+
+    window.addEventListener("touchmove", onWindowTouchMove, { passive: false });
+    window.addEventListener("touchend", onWindowTouchEnd);
+    window.addEventListener("touchcancel", onWindowTouchCancel);
+
+    return () => {
+      window.removeEventListener("touchmove", onWindowTouchMove);
+      window.removeEventListener("touchend", onWindowTouchEnd);
+      window.removeEventListener("touchcancel", onWindowTouchCancel);
+    };
+  }, [handleAutoScroll, stopAutoScroll, getEffectiveList, saveOrder, onToast]);
 
   // Close modals on Escape key
   useEffect(() => {
@@ -699,7 +802,8 @@ export default function MyRecommendations({
               return (
                 <div
                   key={item.id}
-                  draggable={!searchQuery?.trim()}
+                  data-rec-id={item.id}
+                  draggable={!isTouchDevice && !searchQuery?.trim()}
                   onDragStart={(e) => handleDragStart(e, item.id)}
                   onDragOver={(e) => handleDragOver(e, item.id)}
                   onDrop={(e) => handleDrop(e, "created", item.id)}
@@ -708,13 +812,16 @@ export default function MyRecommendations({
                     isMenuActive ? "relative z-30" : "relative z-0"
                   } ${
                     isItemWatched ? "opacity-50 hover:opacity-75" : "opacity-100"
-                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""}`}
+                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""} ${
+                    draggedItemId === item.id ? "opacity-40 scale-[0.99] ring-1 ring-amber-400/40" : ""
+                  }`}
                 >
                   <div className="flex items-start gap-2.5 flex-1 min-w-0">
                     {/* Drag Grip Handle */}
                     <div
-                      className="shrink-0 pt-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1 transition-colors select-none hidden sm:block"
+                      className="shrink-0 pt-1 text-zinc-500 hover:text-zinc-300 active:text-amber-400 cursor-grab active:cursor-grabbing p-1.5 -ml-1 transition-colors select-none touch-none"
                       aria-label="Drag to reorder"
+                      onTouchStart={(e) => handleTouchDragStart(e, item.id, "created")}
                     >
                       <GripVertical className="w-4 h-4" />
                     </div>
@@ -928,7 +1035,8 @@ export default function MyRecommendations({
               return (
                 <div
                   key={item.id}
-                  draggable={!searchQuery?.trim()}
+                  data-rec-id={item.id}
+                  draggable={!isTouchDevice && !searchQuery?.trim()}
                   onDragStart={(e) => handleDragStart(e, item.id)}
                   onDragOver={(e) => handleDragOver(e, item.id)}
                   onDrop={(e) => handleDrop(e, "upvoted", item.id)}
@@ -937,13 +1045,16 @@ export default function MyRecommendations({
                     isMenuActive ? "relative z-30" : "relative z-0"
                   } ${
                     isItemWatched ? "opacity-50 hover:opacity-75" : "opacity-100"
-                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""}`}
+                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""} ${
+                    draggedItemId === item.id ? "opacity-40 scale-[0.99] ring-1 ring-amber-400/40" : ""
+                  }`}
                 >
                   <div className="flex items-start gap-2.5 flex-1 min-w-0">
                     {/* Drag Grip Handle */}
                     <div
-                      className="shrink-0 pt-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1 transition-colors select-none hidden sm:block"
+                      className="shrink-0 pt-1 text-zinc-500 hover:text-zinc-300 active:text-amber-400 cursor-grab active:cursor-grabbing p-1.5 -ml-1 transition-colors select-none touch-none"
                       aria-label="Drag to reorder"
+                      onTouchStart={(e) => handleTouchDragStart(e, item.id, "upvoted")}
                     >
                       <GripVertical className="w-4 h-4" />
                     </div>
@@ -1207,7 +1318,8 @@ export default function MyRecommendations({
               return (
                 <div
                   key={item.id}
-                  draggable={!searchQuery?.trim()}
+                  data-rec-id={item.id}
+                  draggable={!isTouchDevice && !searchQuery?.trim()}
                   onDragStart={(e) => handleDragStart(e, item.id)}
                   onDragOver={(e) => handleDragOver(e, item.id)}
                   onDrop={(e) => handleDrop(e, "private", item.id)}
@@ -1216,13 +1328,16 @@ export default function MyRecommendations({
                     isMenuActive ? "relative z-30" : "relative z-0"
                   } ${
                     isItemWatched ? "opacity-50 hover:opacity-75" : "opacity-100"
-                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""}`}
+                  } ${dragOverItemId === item.id ? "border-amber-400/60 shadow-lg" : ""} ${
+                    draggedItemId === item.id ? "opacity-40 scale-[0.99] ring-1 ring-amber-400/40" : ""
+                  }`}
                 >
                   <div className="flex items-start gap-2.5 flex-1 min-w-0">
                     {/* Drag Grip Handle */}
                     <div
-                      className="shrink-0 pt-1 text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing p-1 transition-colors select-none hidden sm:block"
+                      className="shrink-0 pt-1 text-zinc-500 hover:text-zinc-300 active:text-amber-400 cursor-grab active:cursor-grabbing p-1.5 -ml-1 transition-colors select-none touch-none"
                       aria-label="Drag to reorder"
+                      onTouchStart={(e) => handleTouchDragStart(e, item.id, "private")}
                     >
                       <GripVertical className="w-4 h-4" />
                     </div>
