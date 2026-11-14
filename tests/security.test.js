@@ -20,6 +20,10 @@ assert.equal(getSafeExternalLink(null), null, 'Failed to handle null')
 // Valid http and https URLs must pass safely
 assert.equal(getSafeExternalLink('https://youtube.com/@veritasium'), 'https://youtube.com/@veritasium')
 assert.equal(getSafeExternalLink('http://example.com/item'), 'http://example.com/item')
+// Bare domain / web links without protocol must safely normalize with https://
+assert.equal(getSafeExternalLink('camsim.damoat.com'), 'https://camsim.damoat.com')
+assert.equal(getSafeExternalLink('youtube.com/@veritasium'), 'https://youtube.com/@veritasium')
+assert.equal(getSafeExternalLink('www.google.com/search?q=test'), 'https://www.google.com/search?q=test')
 console.log('  ✅ Passed: All malicious schemes blocked, valid http/https allowed.\n')
 
 // ---------------------------------------------------------

@@ -107,7 +107,7 @@ export default function EditRecommendationModal({ item, isOpen, onClose }) {
     if (extra.trim()) {
       const val = extra.trim()
       if (category === 'yt' || (category === 'app' && (val.includes('.') || /^https?:\/\//i.test(val)))) {
-        metadata.channel_link = val
+        metadata.channel_link = /^https?:\/\//i.test(val) ? val : `https://${val}`
         delete metadata.author
         delete metadata.platform
       } else if (category === 'book') {

@@ -21,12 +21,30 @@ export function getAvatarUrl(avatarUrl, name = 'User') {
 }
 
 /**
- * Validates and sanitizes external URLs to prevent XSS (e.g. javascript: schemes).
+ * Validates, sanitizes, and normalizes external URLs to prevent XSS (e.g. javascript: schemes)
+ * while safely allowing both full http(s) URLs and bare web/domain links (e.g. camsim.damoat.com).
  */
 export function getSafeExternalLink(url) {
   if (!url || typeof url !== 'string') return null
   const trimmed = url.trim()
-  // Only permit valid http or https protocols
+  if (!trimmed) return null
+
+  // Immediately reject dangerous schemes (XSS protection)
+  if (/^(javascript|data|vbscript|file|about|blob):/i.test(trimmed)) return null
+
+  // If already starts with valid http or https protocol
   if (/^https?:\/\//i.test(trimmed)) return trimmed
+
+  // Reject anything with another colon/scheme (e.g. ftp:, gopher:, or malicious scheme injection)
+  if (trimmed.includes(':')) return null
+
+  // If starts with protocol-relative '//'
+  if (/^\/\//.test(trimmed)) return `https:${trimmed}`
+
+  // If it's a domain/host URL (e.g. camsim.damoat.com, youtube.com/@...)
+  if (/^[a-zA-Z0-9][-a-zA-Z0-9]*(\.[a-zA-Z0-9][-a-zA-Z0-9]*)+/i.test(trimmed)) {
+    return `https://${trimmed}`
+  }
+
   return null
 }

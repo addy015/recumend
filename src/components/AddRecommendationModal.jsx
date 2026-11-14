@@ -120,7 +120,7 @@ export default function AddRecommendationModal({
     if (linkOrExtra.trim()) {
       const val = linkOrExtra.trim()
       if (category === 'yt' || (category === 'app' && (val.includes('.') || /^https?:\/\//i.test(val)))) {
-        metadata.channel_link = val
+        metadata.channel_link = /^https?:\/\//i.test(val) ? val : `https://${val}`
       } else if (category === 'book') {
         metadata.author = val
       } else {
@@ -413,7 +413,7 @@ export default function AddRecommendationModal({
                     : category === 'book'
                     ? 'Author name'
                     : category === 'app'
-                    ? 'https://... or App Store'
+                    ? 'https://... or Play Store'
                     : 'e.g. Netflix, Steam, Criterion, HBO'
                 }
                 className="w-full bg-[#1A1A1A] border border-white/[0.1] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 rounded-xl focus:outline-none focus:border-white/30 transition-colors font-mono"
