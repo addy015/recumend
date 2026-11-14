@@ -123,6 +123,30 @@ function MainContent() {
   const [addModalInitialCategory, setAddModalInitialCategory] = useState('movie')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
+  // Network offline/online monitoring
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  const [showBackOnlineToast, setShowBackOnlineToast] = useState(false)
+
+  useEffect(() => {
+    function handleOnline() {
+      setIsOffline(false)
+      setShowBackOnlineToast(true)
+      const timer = setTimeout(() => setShowBackOnlineToast(false), 2600)
+      return () => clearTimeout(timer)
+    }
+    function handleOffline() {
+      setIsOffline(true)
+      setShowBackOnlineToast(false)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   // Listen to browser navigation (back/forward and custom navigate events)
   useEffect(() => {
     if (window.location.hash === '#/landing' || window.location.hash === '#/') {
@@ -250,6 +274,19 @@ function MainContent() {
     <div className="min-h-screen text-[#F3F4F6] flex flex-col font-body selection:bg-rose-600/30 selection:text-rose-200 relative">
       {/* Lives across all routes without remounting */}
       <AtmosphereBackground />
+
+      {/* Network Status Banner */}
+      {isOffline && (
+        <div className="fixed top-0 inset-x-0 z-[100] bg-amber-500/95 backdrop-blur-md text-zinc-950 text-xs font-mono font-bold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-lg">
+          <span className="w-2 h-2 rounded-full bg-zinc-950 animate-pulse" />
+          <span>You are offline. Reconnecting when connection is restored...</span>
+        </div>
+      )}
+      {showBackOnlineToast && (
+        <div className="fixed top-0 inset-x-0 z-[100] bg-emerald-500/95 backdrop-blur-md text-zinc-950 text-xs font-mono font-bold py-1.5 px-4 text-center flex items-center justify-center gap-2 shadow-lg transition-all">
+          <span>✓ Back online</span>
+        </div>
+      )}
 
       {route.page === 'landing' ? (
         <LandingPage

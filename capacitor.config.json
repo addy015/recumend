@@ -4,7 +4,10 @@
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "url": "https://recumend.vercel.app",
+    "cleartext": false,
+    "androidScheme": "https",
+    "errorPath": "offline.html"
   },
   "plugins": {
     "StatusBar": {
