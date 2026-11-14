@@ -1487,6 +1487,18 @@ export default function MyRecommendations({
                               type="button"
                               onClick={() => {
                                 setActiveMenuId(null);
+                                setEditingItem(item);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
+                            >
+                              <Edit3 className="w-4 h-4 text-zinc-400" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuId(null);
                                 setPrivacyModalItem(item);
                               }}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-zinc-300 hover:text-white hover:bg-white/[0.06] rounded-xl text-left transition-colors cursor-pointer min-h-[36px]"
