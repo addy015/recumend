@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext'
 import { CATEGORIES, getCategoryBadgeClass } from '../constants/categories'
 import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
 import CategoryFilter from './CategoryFilter'
+import ExpandableNote from './ExpandableNote'
 
 // Lightweight relative time helper
 function formatRelativeTime(dateString) {
@@ -32,6 +33,51 @@ function formatRelativeTime(dateString) {
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
   return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function ExpandableFriendNote({ activeSubTab, sender, recipient, onOpenProfile, note }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const cleanNote = note?.trim() || ''
+  if (!cleanNote) return null
+  const isLongNote = cleanNote.length > 95 || cleanNote.includes('\n')
+
+  return (
+    <div className="p-3 bg-amber-400/[0.04] border border-amber-400/20 rounded-xl text-xs text-amber-200/90 leading-relaxed italic">
+      <span className="font-mono text-[10px] font-bold text-amber-400 uppercase not-italic block mb-0.5">
+        {activeSubTab === 'with-me' ? (
+          sender?.username ? (
+            <button
+              type="button"
+              onClick={() => onOpenProfile(sender)}
+              className="hover:underline cursor-pointer inline-flex items-center gap-1 text-amber-400"
+              aria-label={`View @${sender.username}'s profile`}
+            >
+              Note from @{sender.username}:
+            </button>
+          ) : (
+            <span>Note from friend:</span>
+          )
+        ) : (
+          <span>Your note to @{recipient?.username || 'friend'}:</span>
+        )}
+      </span>
+      <p className={`break-words whitespace-pre-line ${isExpanded ? '' : 'line-clamp-2'}`}>
+        "{cleanNote}"
+      </p>
+      {isLongNote && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setIsExpanded((prev) => !prev)
+          }}
+          className="mt-1 text-[11px] font-mono font-medium text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer inline-flex items-center not-italic select-none"
+        >
+          {isExpanded ? '... less' : '... more'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 export default function SharedWithMe({ isActive = false, searchQuery = '', onToast, onSelectUser }) {
@@ -588,34 +634,18 @@ export default function SharedWithMe({ isActive = false, searchQuery = '', onToa
 
                   {/* Personal Note Block */}
                   {item.note && (
-                    <div className="p-3 bg-amber-400/[0.04] border border-amber-400/20 rounded-xl text-xs text-amber-200/90 leading-relaxed italic">
-                      <span className="font-mono text-[10px] font-bold text-amber-400 uppercase not-italic block mb-0.5">
-                        {activeSubTab === 'with-me' ? (
-                          sender?.username ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenProfile(sender)}
-                              className="hover:underline cursor-pointer inline-flex items-center gap-1 text-amber-400"
-                              aria-label={`View @${sender.username}'s profile`}
-                            >
-                              Note from @{sender.username}:
-                            </button>
-                          ) : (
-                            <span>Note from friend:</span>
-                          )
-                        ) : (
-                          <span>Your note to @{recipient?.username || 'friend'}:</span>
-                        )}
-                      </span>
-                      "{item.note}"
-                    </div>
+                    <ExpandableFriendNote
+                      activeSubTab={activeSubTab}
+                      sender={sender}
+                      recipient={recipient}
+                      onOpenProfile={handleOpenProfile}
+                      note={item.note}
+                    />
                   )}
 
                   {/* Item's original curator note */}
                   {item.metadata?.note && (
-                    <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
-                      "{item.metadata.note}"
-                    </p>
+                    <ExpandableNote note={item.metadata.note} />
                   )}
 
                   {getSafeExternalLink(item.metadata?.channel_link) && (

@@ -27,6 +27,7 @@ import { getSafeExternalLink, getAvatarUrl } from "../lib/avatar";
 import CategoryFilter from "./CategoryFilter";
 import EditRecommendationModal from "./EditRecommendationModal";
 import ExportRecsModal from "./ExportRecsModal";
+import ExpandableNote from "./ExpandableNote";
 
 // User dashboard for managing personal created recommendations, private vault items, and endorsements
 export default function MyRecommendations({
@@ -851,9 +852,7 @@ export default function MyRecommendations({
                       </h3>
 
                       {item.metadata?.note && (
-                        <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
-                          "{item.metadata.note}"
-                        </p>
+                        <ExpandableNote note={item.metadata.note} />
                       )}
 
                       {getSafeExternalLink(item.metadata?.channel_link) && (
@@ -1105,9 +1104,7 @@ export default function MyRecommendations({
                       </h3>
 
                       {item.metadata?.note && (
-                        <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
-                          "{item.metadata.note}"
-                        </p>
+                        <ExpandableNote note={item.metadata.note} />
                       )}
 
                       {getSafeExternalLink(item.metadata?.channel_link) && (
@@ -1367,9 +1364,7 @@ export default function MyRecommendations({
                       </h3>
 
                       {item.metadata?.note && (
-                        <p className="text-xs text-zinc-400 mt-1 line-clamp-2 leading-relaxed border-l border-white/20 pl-2.5 italic">
-                          "{item.metadata.note}"
-                        </p>
+                        <ExpandableNote note={item.metadata.note} />
                       )}
 
                       {getSafeExternalLink(item.metadata?.channel_link) && (
