@@ -37,9 +37,37 @@ function formatRelativeTime(dateString) {
 
 function ExpandableFriendNote({ activeSubTab, sender, recipient, onOpenProfile, note }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isClamped, setIsClamped] = useState(false)
+  const textRef = useRef(null)
   const cleanNote = note?.trim() || ''
   if (!cleanNote) return null
-  const isLongNote = cleanNote.length > 95 || cleanNote.includes('\n')
+
+  useEffect(() => {
+    const el = textRef.current
+    if (!el) return
+
+    const checkOverflow = () => {
+      if (!isExpanded) {
+        setIsClamped(el.scrollHeight > el.clientHeight + 1)
+      }
+    }
+
+    checkOverflow()
+
+    let resizeObserver = null
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => checkOverflow())
+      resizeObserver.observe(el)
+    }
+
+    window.addEventListener('resize', checkOverflow)
+    return () => {
+      window.removeEventListener('resize', checkOverflow)
+      if (resizeObserver) resizeObserver.disconnect()
+    }
+  }, [cleanNote, isExpanded])
+
+  const showToggle = isClamped || isExpanded
 
   return (
     <div className="p-3 bg-amber-400/[0.04] border border-amber-400/20 rounded-xl text-xs text-amber-200/90 leading-relaxed italic">
@@ -61,10 +89,10 @@ function ExpandableFriendNote({ activeSubTab, sender, recipient, onOpenProfile, 
           <span>Your note to @{recipient?.username || 'friend'}:</span>
         )}
       </span>
-      <p className={`break-words whitespace-pre-line ${isExpanded ? '' : 'line-clamp-2'}`}>
+      <p ref={textRef} className={`break-words whitespace-pre-line ${isExpanded ? '' : 'line-clamp-2'}`}>
         "{cleanNote}"
       </p>
-      {isLongNote && (
+      {showToggle && (
         <button
           type="button"
           onClick={(e) => {

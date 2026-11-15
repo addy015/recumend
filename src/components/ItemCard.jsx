@@ -1,15 +1,15 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { ArrowBigUp, ExternalLink, Lock, Share2 } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
 import { CATEGORIES, getCategoryBadgeClass } from '../constants/categories'
 import { getAvatarUrl, getSafeExternalLink } from '../lib/avatar'
+import ExpandableNote from './ExpandableNote'
 
 // Individual recommendation card showing rank (in leaderboard), title, creator, and upvote button
 export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboard = false, onOpenShare }) {
   const { userRecs, toggleRecommend } = useItems()
   const { user, signInWithGoogle } = useAuth()
-  const [isExpanded, setIsExpanded] = useState(false)
 
   // The creator's upvote is permanently locked at +1
   const isOwner = Boolean(user?.id && item.created_by === user.id)
@@ -34,12 +34,11 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
   const formattedRank = rank ? String(rank).padStart(2, '0') : null
   const note = item.metadata?.note?.trim() || ''
   const hasNote = Boolean(note)
-  const isLongNote = note.length > 95 || note.includes('\n')
 
   return (
     <article
-      className={`group rounded-2xl flex items-start gap-3.5 sm:gap-4 transition-all duration-150 shadow-sm taste-card ${
-        hasNote ? 'p-4 sm:p-5' : 'py-3 px-4 sm:py-3.5 sm:px-5'
+      className={`group rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-start justify-between gap-3 sm:gap-4 transition-all duration-150 shadow-sm taste-card ${
+        hasNote ? 'p-4 sm:p-5' : 'py-3.5 px-4 sm:py-3.5 sm:px-5'
       } ${
         isLeaderboard && rank === 1
           ? 'bg-gradient-to-r from-rose-950/40 via-[#141414] to-[#121212] border border-rose-500/30 hover:border-rose-500/50'
@@ -50,201 +49,205 @@ export default function ItemCard({ item, rank = null, onSelectUser, isLeaderboar
           : 'bg-[#121212]/92 hover:bg-[#161616] border border-white/[0.08] hover:border-white/[0.18]'
       }`}
     >
-      {formattedRank && (
-        <div className="shrink-0 pt-0.5 select-none w-6 sm:w-7 text-right">
-          <span
-            className={`font-mono text-xs sm:text-sm tabular-nums tracking-tighter ${
-              isLeaderboard && rank === 1
-                ? 'text-amber-400 font-black drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]'
-                : isLeaderboard && rank === 2
-                ? 'text-slate-200 font-extrabold'
-                : isLeaderboard && rank === 3
-                ? 'text-amber-600 font-bold'
-                : 'text-zinc-600 font-medium group-hover:text-zinc-400'
-            }`}
-          >
-            {formattedRank}
-          </span>
-        </div>
-      )}
-
-      {/* Main Content Column */}
-      <div className={`flex-1 min-w-0 ${hasNote ? 'space-y-2' : 'space-y-1 sm:space-y-1.5'}`}>
-        {/* Minimal Metadata Strip */}
-        <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 flex-wrap">
-          <span
-            className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md border ${getCategoryBadgeClass(
-              item.category
-            )}`}
-          >
-            {displayCategory}
-          </span>
-
-          {item.metadata?.year && (
-            <span>{item.metadata.year}</span>
-          )}
-
-          {item.metadata?.author && (
-            <span className="truncate">
-              by <strong className="text-zinc-300 font-medium">{item.metadata.author}</strong>
-            </span>
-          )}
-
-          {item.metadata?.platform && (
-            <span>• {item.metadata.platform}</span>
-          )}
-
-          {item.is_private && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-              <Lock className="w-3 h-3 text-emerald-400" />
-              <span>Vault</span>
-            </span>
-          )}
-
-          {isOwner && !item.is_private && (
-            <span className="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/25">
-              My Rec
-            </span>
-          )}
-        </div>
-
-        {/* Hero Title */}
-        <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-white transition-colors tracking-tight leading-snug break-words">
-          {item.title}
-        </h3>
-
-        {/* Recommender Note & Username */}
-        {(hasNote || item.creator?.username) && (
-          <div className={`${hasNote ? 'pt-1' : 'pt-0.5'} flex items-baseline justify-between gap-3 flex-wrap sm:flex-nowrap`}>
-            {hasNote ? (
-              <div className="flex-1 min-w-0">
-                <p className={`border-l-2 border-amber-400/40 pl-2.5 text-xs text-zinc-300 italic leading-relaxed break-words whitespace-pre-line ${isExpanded ? '' : 'line-clamp-2'}`}>
-                  "{note}"
-                </p>
-                {isLongNote && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setIsExpanded(prev => !prev)
-                    }}
-                    className="mt-1 pl-2.5 text-[11px] font-mono font-medium text-amber-400/90 hover:text-amber-300 transition-colors cursor-pointer inline-flex items-center not-italic select-none"
-                  >
-                    {isExpanded ? '... less' : '... more'}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex-1" />
-            )}
-
-            {item.creator?.username && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSelectUser?.(item.creator)
-                }}
-                className={`shrink-0 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user self-end sm:self-auto ${
-                  hasNote ? 'min-h-[26px]' : 'min-h-0 py-0'
-                }`}
-                aria-label={`View @${item.creator.username}'s public profile`}
-              >
-                <img
-                  src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
-                  alt=""
-                  className="w-4 h-4 object-cover rounded-full shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.src = getAvatarUrl(null, item.creator.display_name || item.creator.username)
-                  }}
-                />
-                <span>
-                  <span className="text-zinc-600">@</span>
-                  <span className="hover:underline text-zinc-400 group-hover/user:text-white">{item.creator.username}</span>
-                </span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* External Link */}
-        {getSafeExternalLink(item.metadata?.channel_link) && (
-          <div className="pt-0.5">
-            <a
-              href={getSafeExternalLink(item.metadata.channel_link)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white transition-colors"
+      <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+        {formattedRank && (
+          <div className="hidden sm:block shrink-0 pt-0.5 select-none w-6 sm:w-7 text-right">
+            <span
+              className={`font-mono text-xs sm:text-sm tabular-nums tracking-tighter ${
+                isLeaderboard && rank === 1
+                  ? 'text-amber-400 font-black drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+                  : isLeaderboard && rank === 2
+                  ? 'text-slate-200 font-extrabold'
+                  : isLeaderboard && rank === 3
+                  ? 'text-amber-600 font-bold'
+                  : 'text-zinc-600 font-medium group-hover:text-zinc-400'
+              }`}
             >
-              <span>Visit link</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+              {formattedRank}
+            </span>
           </div>
         )}
+
+        {/* Main Content Column */}
+        <div className={`flex-1 min-w-0 ${hasNote ? 'space-y-2' : 'space-y-1 sm:space-y-1.5'}`}>
+          {/* Minimal Metadata Strip */}
+          <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 flex-wrap">
+            {formattedRank && (
+              <span
+                className={`sm:hidden font-mono text-xs tabular-nums tracking-tighter ${
+                  isLeaderboard && rank === 1
+                    ? 'text-amber-400 font-black drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]'
+                    : isLeaderboard && rank === 2
+                    ? 'text-slate-200 font-extrabold'
+                    : isLeaderboard && rank === 3
+                    ? 'text-amber-600 font-bold'
+                    : 'text-zinc-500 font-semibold'
+                }`}
+              >
+                {formattedRank}
+              </span>
+            )}
+
+            <span
+              className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-md border ${getCategoryBadgeClass(
+                item.category
+              )}`}
+            >
+              {displayCategory}
+            </span>
+
+            {item.metadata?.year && (
+              <span>{item.metadata.year}</span>
+            )}
+
+            {item.metadata?.author && (
+              <span className="truncate">
+                by <strong className="text-zinc-300 font-medium">{item.metadata.author}</strong>
+              </span>
+            )}
+
+            {item.metadata?.platform && (
+              <span>• {item.metadata.platform}</span>
+            )}
+
+            {item.is_private && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                <Lock className="w-3 h-3 text-emerald-400" />
+                <span>Vault</span>
+              </span>
+            )}
+
+            {isOwner && !item.is_private && (
+              <span className="text-[10px] uppercase tracking-wide text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/25">
+                My Rec
+              </span>
+            )}
+          </div>
+
+          {/* Hero Title */}
+          <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-white transition-colors tracking-tight leading-snug break-words">
+            {item.title}
+          </h3>
+
+          {/* Recommender Note */}
+          {hasNote && (
+            <div className="pt-1">
+              <ExpandableNote note={note} className="mt-0" />
+            </div>
+          )}
+
+          {/* External Link */}
+          {getSafeExternalLink(item.metadata?.channel_link) && (
+            <div className="pt-0.5">
+              <a
+                href={getSafeExternalLink(item.metadata.channel_link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-white transition-colors"
+              >
+                <span>Visit link</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Action Buttons Container */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-center">
-        {/* Share Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!user) {
-              signInWithGoogle()
-              return
-            }
-            onOpenShare?.(item)
-          }}
-          className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
-          aria-label="Share recommendation"
-        >
-          <Share2 className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="hidden sm:inline">Share</span>
-        </button>
-
-        {/* Upvote Button */}
-        <button
-          type="button"
-          onClick={handleVote}
-          disabled={isOwner || item.is_private}
-          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-mono font-bold rounded-xl transition-all active:scale-95 duration-75 select-none min-h-[40px] shrink-0 border ${
-            item.is_private
-              ? 'bg-white/[0.02] border-white/[0.04] text-zinc-600 cursor-not-allowed opacity-40'
-              : isOwner
-              ? 'bg-amber-400/10 border-amber-400/25 text-amber-300 cursor-default'
-              : isRecommended
-              ? 'bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)] cursor-pointer'
-              : 'bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30 cursor-pointer'
-          }`}
-          aria-label={
-            item.is_private
-              ? 'Private item'
-              : isOwner
-              ? 'Created by you (locked)'
-              : isRecommended
-              ? 'Remove recommendation'
-              : 'Upvote recommendation'
-          }
-        >
-          <ArrowBigUp
-            className={`w-4 h-4 shrink-0 transition-transform duration-75 ${
-              isRecommended && !item.is_private
-                ? 'fill-black stroke-black'
-                : isOwner
-                ? 'fill-amber-400 stroke-amber-400'
-                : 'text-zinc-400'
-            }`}
-          />
-          <span className="tabular-nums font-bold">
-            {item.recommend_count}
-          </span>
-          {isOwner && !item.is_private && (
-            <span className="text-[9px] font-mono text-amber-400/90 uppercase font-semibold leading-none tracking-tight hidden sm:inline">
-              Lock
-            </span>
+      {/* Action Buttons & Curator Footer on Mobile / Inline on Desktop */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-stretch sm:self-center justify-between sm:justify-end pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
+        {/* Creator Username (Bottom left on mobile, hidden on desktop if empty) */}
+        <div className="flex items-center gap-1.5">
+          {item.creator?.username ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSelectUser?.(item.creator)
+              }}
+              className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 hover:text-white transition-colors cursor-pointer group/user py-1"
+              aria-label={`View @${item.creator.username}'s public profile`}
+            >
+              <img
+                src={getAvatarUrl(item.creator.avatar_url, item.creator.display_name || item.creator.username)}
+                alt=""
+                className="w-4 h-4 object-cover rounded-full shrink-0"
+                onError={(e) => {
+                  e.currentTarget.src = getAvatarUrl(null, item.creator.display_name || item.creator.username)
+                }}
+              />
+              <span>
+                <span className="text-zinc-600">@</span>
+                <span className="hover:underline text-zinc-400 group-hover/user:text-white">{item.creator.username}</span>
+              </span>
+            </button>
+          ) : (
+            <span />
           )}
-        </button>
+        </div>
+
+        {/* Buttons: Share & Upvote */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Share Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!user) {
+                signInWithGoogle()
+                return
+              }
+              onOpenShare?.(item)
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] text-zinc-300 hover:text-white text-xs font-medium transition-colors border border-white/[0.1] rounded-xl cursor-pointer min-h-[40px]"
+            aria-label="Share recommendation"
+          >
+            <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="hidden sm:inline">Share</span>
+          </button>
+
+          {/* Upvote Button */}
+          <button
+            type="button"
+            onClick={handleVote}
+            disabled={isOwner || item.is_private}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-mono font-bold rounded-xl transition-all active:scale-95 duration-75 select-none min-h-[40px] shrink-0 border ${
+              item.is_private
+                ? 'bg-white/[0.02] border-white/[0.04] text-zinc-600 cursor-not-allowed opacity-40'
+                : isOwner
+                ? 'bg-amber-400/10 border-amber-400/25 text-amber-300 cursor-default'
+                : isRecommended
+                ? 'bg-amber-400 hover:bg-amber-300 text-black border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.18)] cursor-pointer'
+                : 'bg-white/[0.04] hover:bg-amber-400/10 text-zinc-300 hover:text-amber-300 border-white/[0.1] hover:border-amber-400/30 cursor-pointer'
+            }`}
+            aria-label={
+              item.is_private
+                ? 'Private item'
+                : isOwner
+                ? 'Created by you (locked)'
+                : isRecommended
+                ? 'Remove recommendation'
+                : 'Upvote recommendation'
+            }
+          >
+            <ArrowBigUp
+              className={`w-4 h-4 shrink-0 transition-transform duration-75 ${
+                isRecommended && !item.is_private
+                  ? 'fill-black stroke-black'
+                  : isOwner
+                  ? 'fill-amber-400 stroke-amber-400'
+                  : 'text-zinc-400'
+              }`}
+            />
+            <span className="tabular-nums font-bold">
+              {item.recommend_count}
+            </span>
+            {isOwner && !item.is_private && (
+              <span className="text-[9px] font-mono text-amber-400/90 uppercase font-semibold leading-none tracking-tight hidden sm:inline">
+                Lock
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </article>
   )

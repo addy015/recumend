@@ -189,7 +189,7 @@ export default function Navbar({
 
             {/* User Search Dropdown */}
             {searchFocused && searchQuery.trim() && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#141414] border border-white/[0.12] shadow-2xl rounded-2xl z-50 overflow-hidden divide-y divide-white/[0.06]">
+              <div className="fixed sm:absolute top-16 sm:top-full left-3 right-3 sm:left-0 sm:right-0 mt-2 sm:mt-2 bg-[#141414] border border-white/[0.12] shadow-2xl rounded-2xl z-50 overflow-hidden divide-y divide-white/[0.06] max-h-[70vh] overflow-y-auto">
                 {matchingUsers.length > 0 && (
                   <div className="p-2 space-y-1">
                     <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
