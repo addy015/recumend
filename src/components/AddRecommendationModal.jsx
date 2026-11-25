@@ -437,14 +437,9 @@ export default function AddRecommendationModal({
                           <span className="font-semibold text-white truncate block">{it.title}</span>
                           <div className="text-[10px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
                             <span className="uppercase text-zinc-300">{catLabel}</span>
-                            <span>•</span>
-                            {ownership.kind === 'own_vault' ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-300">
-                                <Lock className="w-2.5 h-2.5" />
-                                <span>{ownership.sourceLabel}</span>
-                              </span>
-                            ) : (
+                            {ownership.kind !== 'own_vault' && (
                               <>
+                                <span>•</span>
                                 <span>{ownership.sourceLabel}</span>
                                 <span>•</span>
                                 <span>{it.recommend_count} recs</span>
