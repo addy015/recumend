@@ -581,31 +581,40 @@ function MainContent() {
       {/* Floating Toast Notification Banner */}
       {toast && (
         <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-[#141414] text-white border border-white/[0.12] rounded-full shadow-2xl font-mono text-xs max-w-[90vw] animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="fixed inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-50 flex justify-center pointer-events-none"
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <span className="text-zinc-300 select-none">{toast.message}</span>
-          {toast.actionLabel && toast.onAction && (
-            <button
-              type="button"
-              onClick={() => {
-                toast.onAction()
-                setToast(null)
-              }}
-              className="px-3 py-1 bg-white text-black hover:bg-zinc-200 rounded-full text-xs font-semibold font-body transition-colors cursor-pointer whitespace-nowrap"
-            >
-              {toast.actionLabel}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            aria-label="Close notification"
-            className="p-1 text-zinc-500 hover:text-white rounded-full transition-colors cursor-pointer"
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-auto w-full max-w-md sm:w-auto sm:max-w-lg flex items-center justify-between gap-3 px-4 py-3 sm:py-2.5 bg-[#141414]/95 backdrop-blur-md text-white border border-white/[0.14] rounded-2xl sm:rounded-full shadow-2xl text-xs sm:text-[13px] animate-in fade-in slide-in-from-bottom-2 duration-200"
           >
-            <X className="w-3.5 h-3.5" />
-          </button>
+            <span className="flex-1 min-w-0 text-zinc-200 leading-snug font-body select-none break-words">
+              {toast.message}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {toast.actionLabel && toast.onAction && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.onAction()
+                    setToast(null)
+                  }}
+                  className="px-3 py-1.5 bg-white text-black hover:bg-zinc-200 rounded-full text-xs font-semibold font-body transition-colors cursor-pointer whitespace-nowrap shrink-0 min-h-[32px]"
+                >
+                  {toast.actionLabel}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                aria-label="Close notification"
+                className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.08] rounded-full transition-colors cursor-pointer shrink-0 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { syncUnifiedVault } from '../lib/googleDriveVault'
 import { encryptData, decryptData } from '../lib/vaultCrypto'
+import { normalizeRecommendationTitle, findPrivateVaultDuplicate } from '../lib/recommendationMatching'
 
 // Recommendation items and votes context
 const ItemContext = createContext(null)
@@ -742,11 +743,7 @@ export function ItemProvider({ children }) {
 
   // Strip punctuation and normalize whitespace for duplicate detection
   function normalizeTitle(str) {
-    return str
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .replace(/\s+/g, ' ')
+    return normalizeRecommendationTitle(str)
   }
 
   // Upvote or remove upvote for an item (+1 / -1)
@@ -862,7 +859,7 @@ export function ItemProvider({ children }) {
   }
 
   // Add a new recommendation with deduplication checks (supports public and private E2EE items)
-  async function addItem({ title, category, metadata = {}, is_private = false, isPrivate = false }) {
+  async function addItem({ title, category, metadata = {}, is_private = false, isPrivate = false, forceDuplicate = false }) {
     if (!user) return { error: 'Must be logged in' }
 
     const targetIsPrivate = Boolean(is_private || isPrivate)
@@ -895,6 +892,24 @@ export function ItemProvider({ children }) {
 
     // Handle Private E2EE Vault Item
     if (targetIsPrivate) {
+      if (!forceDuplicate) {
+        const userPrivateItems = items.filter(it => it.is_private && it.created_by === user.id)
+        const existingPrivate = findPrivateVaultDuplicate({
+          title: cleanTitle,
+          category,
+          privateItems: userPrivateItems
+        })
+        if (existingPrivate) {
+          return {
+            exists: true,
+            duplicate: true,
+            isPrivateDuplicate: true,
+            item: existingPrivate,
+            existingItem: existingPrivate
+          }
+        }
+      }
+
       if (!vaultKeys?.vaultKey) {
         return { error: 'Encryption vault is still syncing with Google Drive. Please wait a few seconds and try again.' }
       }

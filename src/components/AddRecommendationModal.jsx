@@ -3,6 +3,11 @@ import { X, Plus, Check, AlertCircle, Lock } from 'lucide-react'
 import { useItems } from '../context/ItemContext'
 import { useAuth } from '../context/AuthContext'
 import { CATEGORIES } from '../constants/categories'
+import {
+  findMatchingExistingItems,
+  getMatchOwnership,
+  isItemPlaintextAvailable
+} from '../lib/recommendationMatching'
 
 // Modal dialog for submitting a new recommendation or upvoting existing matches
 export default function AddRecommendationModal({
@@ -12,7 +17,7 @@ export default function AddRecommendationModal({
   initialCategory = 'movie',
   onSuccess
 }) {
-  const { items, addItem, toggleRecommend, userRecs, normalizeTitle } = useItems()
+  const { items, myPrivateItems = [], addItem, toggleRecommend, userRecs, isVaultSyncing } = useItems()
   const { user, signInWithGoogle } = useAuth()
 
   // Ref to title input for auto-focus
@@ -28,17 +33,26 @@ export default function AddRecommendationModal({
   const [isPrivate, setIsPrivate] = useState(Boolean(initialPrivate))
   const [status, setStatus] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [upvotingId, setUpvotingId] = useState(null)
   const [duplicateCandidate, setDuplicateCandidate] = useState(null)
+  const [pendingPrivatePayload, setPendingPrivatePayload] = useState(null)
   const [prevOpen, setPrevOpen] = useState(isOpen)
 
-  // Adjust state during render when modal opens
+  // Reset and initialize form state when modal opens (handles external/hardware-back closes cleanly)
   if (isOpen !== prevOpen) {
     setPrevOpen(isOpen)
     if (isOpen) {
+      setTitle('')
+      setCategory(initialCategory && initialCategory !== 'all' ? initialCategory : 'movie')
+      setCustomCategory('')
+      setNote('')
+      setLinkOrExtra('')
       setIsPrivate(Boolean(initialPrivate))
-      if (initialCategory && initialCategory !== 'all') {
-        setCategory(initialCategory)
-      }
+      setStatus(null)
+      setIsSubmitting(false)
+      setUpvotingId(null)
+      setDuplicateCandidate(null)
+      setPendingPrivatePayload(null)
     }
   }
 
@@ -62,7 +76,9 @@ export default function AddRecommendationModal({
     setIsPrivate(Boolean(initialPrivate))
     setStatus(null)
     setIsSubmitting(false)
+    setUpvotingId(null)
     setDuplicateCandidate(null)
+    setPendingPrivatePayload(null)
   }, [initialCategory, initialPrivate])
 
   const handleClose = useCallback(() => {
@@ -80,15 +96,43 @@ export default function AddRecommendationModal({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleClose])
 
-  // Find matching items in real time while user is typing
+  const lockedVaultCount = useMemo(
+    () => myPrivateItems.filter(it => !isItemPlaintextAvailable(it)).length,
+    [myPrivateItems]
+  )
+
+  // Find matching items across Public Recommendations and unlocked Private Vault Items while typing
   const matchingExistingItems = useMemo(() => {
-    if (isSubmitting || duplicateCandidate || isPrivate) return []
-    if (!title.trim() || title.trim().length < 2) return []
-    const norm = normalizeTitle(title)
-    return items.filter(it => it.normalized_title.includes(norm) || norm.includes(it.normalized_title))
-  }, [title, items, normalizeTitle, isSubmitting, duplicateCandidate, isPrivate])
+    if (isSubmitting || duplicateCandidate) return []
+    return findMatchingExistingItems({
+      query: title,
+      publicItems: items,
+      privateItems: myPrivateItems
+    })
+  }, [title, items, myPrivateItems, isSubmitting, duplicateCandidate])
 
   if (!isOpen) return null
+
+  const buildMetadata = () => {
+    const metadata = {}
+    if (category === 'other' && customCategory.trim()) {
+      metadata.custom_category = customCategory.trim()
+    }
+    if (note.trim()) {
+      metadata.note = note.trim()
+    }
+    if (linkOrExtra.trim()) {
+      const val = linkOrExtra.trim()
+      if (category === 'yt' || (category === 'app' && (val.includes('.') || /^https?:\/\//i.test(val)))) {
+        metadata.channel_link = /^https?:\/\//i.test(val) ? val : `https://${val}`
+      } else if (category === 'book') {
+        metadata.author = val
+      } else {
+        metadata.platform = val
+      }
+    }
+    return metadata
+  }
 
   // Handle recommendation form submission
   const handleSubmit = async (e) => {
@@ -107,40 +151,27 @@ export default function AddRecommendationModal({
     setIsSubmitting(true)
     setStatus(null)
 
-    // Build category-specific metadata object
-    const metadata = {}
-    if (category === 'other' && customCategory.trim()) {
-      metadata.custom_category = customCategory.trim()
-    }
-
-    if (note.trim()) {
-      metadata.note = note.trim()
-    }
-
-    if (linkOrExtra.trim()) {
-      const val = linkOrExtra.trim()
-      if (category === 'yt' || (category === 'app' && (val.includes('.') || /^https?:\/\//i.test(val)))) {
-        metadata.channel_link = /^https?:\/\//i.test(val) ? val : `https://${val}`
-      } else if (category === 'book') {
-        metadata.author = val
-      } else {
-        metadata.platform = val
-      }
-    }
-
-    // Call addItem from context
-    const res = await addItem({
+    const metadata = buildMetadata()
+    const payload = {
       title: title.trim(),
       category,
       metadata,
       is_private: isPrivate,
       isPrivate
-    })
+    }
+
+    const res = await addItem(payload)
 
     setIsSubmitting(false)
 
     if (res?.duplicate || res?.exists) {
-      setDuplicateCandidate(res.existingItem || res.item)
+      const existingItem = res.existingItem || res.item
+      if (res.isPrivateDuplicate) {
+        setPendingPrivatePayload(payload)
+        setDuplicateCandidate({ ...existingItem, is_private: true })
+      } else {
+        setDuplicateCandidate(existingItem)
+      }
       return
     }
 
@@ -155,9 +186,31 @@ export default function AddRecommendationModal({
     onClose()
   }
 
-  // Immediately upvote an existing matching recommendation
+  // Save a second independent Private Vault Item after duplicate confirmation
+  const handleForceSavePrivateDuplicate = async () => {
+    if (!pendingPrivatePayload || isSubmitting) return
+    setIsSubmitting(true)
+    setStatus(null)
+
+    const res = await addItem({ ...pendingPrivatePayload, forceDuplicate: true })
+    setIsSubmitting(false)
+
+    if (res?.error) {
+      setStatus({ type: 'error', msg: res.error })
+      return
+    }
+
+    onSuccess?.({ isPrivate: true, item: res.item })
+    resetForm()
+    onClose()
+  }
+
+  // Immediately upvote an existing matching recommendation (only for another user's public item)
   const handleRecommendExisting = async (itemId) => {
+    if (upvotingId) return
+    setUpvotingId(itemId)
     const res = await toggleRecommend(itemId)
+    setUpvotingId(null)
     if (res?.error) {
       setStatus({ type: 'error', msg: res.error })
       return
@@ -170,8 +223,10 @@ export default function AddRecommendationModal({
 
   // Confirm upvote on duplicate modal
   const handleConfirmUpvote = async () => {
-    if (!duplicateCandidate) return
+    if (!duplicateCandidate || isSubmitting) return
+    setIsSubmitting(true)
     const res = await toggleRecommend(duplicateCandidate.id)
+    setIsSubmitting(false)
     if (res?.error) {
       setStatus({ type: 'error', msg: res.error })
       return
@@ -187,6 +242,10 @@ export default function AddRecommendationModal({
     resetForm()
     onClose()
   }
+
+  const isDuplicateOwnOrVoted = duplicateCandidate
+    ? userRecs.has(duplicateCandidate.id) || (user?.id && duplicateCandidate.created_by === user.id)
+    : false
 
   return (
     <div
@@ -213,6 +272,7 @@ export default function AddRecommendationModal({
           <button
             type="button"
             onClick={handleClose}
+            aria-label="Close modal"
             className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -224,65 +284,113 @@ export default function AddRecommendationModal({
           <div className="space-y-4 py-1">
             <div className="p-4 bg-white/[0.04] border border-white/[0.12] rounded-xl space-y-3">
               <div className="flex items-start gap-2.5 text-zinc-200">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-zinc-400" />
-                <div>
+                {duplicateCandidate.is_private ? (
+                  <Lock className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-zinc-400" />
+                )}
+                <div className="min-w-0">
                   <h3 className="font-display text-sm font-bold text-white">
-                    Already recommended on site
+                    {duplicateCandidate.is_private ? 'Already in your Private Vault' : 'Already recommended on site'}
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    "{duplicateCandidate.title}" is already on the leaderboard.
+                  <p className="text-xs text-zinc-400 mt-0.5 break-words">
+                    {duplicateCandidate.is_private
+                      ? `"${duplicateCandidate.title}" is already saved in your Private Vault.`
+                      : `"${duplicateCandidate.title}" is already on the leaderboard.`}
                   </p>
                 </div>
               </div>
 
               {/* Existing item snapshot */}
-              <div className="p-3 bg-[#1A1A1A] border border-white/[0.08] rounded-xl flex items-center justify-between text-xs">
-                <div>
-                  <div className="font-display font-bold text-white text-sm">
-                    {duplicateCandidate.title}
-                  </div>
-                  <div className="text-[11px] text-zinc-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
-                    <span className="uppercase text-zinc-300 bg-white/[0.06] px-2 py-0.5 rounded-md border border-white/[0.08]">
-                      {CATEGORIES.find(c => c.id === duplicateCandidate.category)?.label || duplicateCandidate.category}
-                    </span>
-                    <span>•</span>
-                    <span>{duplicateCandidate.recommend_count} recommendations</span>
-                    {duplicateCandidate.creator?.username && (
-                      <>
-                        <span>•</span>
-                        <span>by @{duplicateCandidate.creator.username}</span>
-                      </>
-                    )}
-                  </div>
+              <div className="p-3 bg-[#1A1A1A] border border-white/[0.08] rounded-xl text-xs space-y-1.5">
+                <div className="font-display font-bold text-white text-sm break-words">
+                  {duplicateCandidate.title}
                 </div>
+                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-zinc-300 bg-white/[0.06] px-2 py-0.5 rounded-md border border-white/[0.08]">
+                    {CATEGORIES.find(c => c.id === duplicateCandidate.category)?.label || duplicateCandidate.category}
+                  </span>
+                  {duplicateCandidate.is_private ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                      <Lock className="w-3 h-3" />
+                      <span>Private Vault</span>
+                    </span>
+                  ) : (
+                    <>
+                      <span>•</span>
+                      <span>{duplicateCandidate.recommend_count} recommendations</span>
+                      {duplicateCandidate.creator?.username && (
+                        <>
+                          <span>•</span>
+                          <span>by @{duplicateCandidate.creator.username}</span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+                {duplicateCandidate.is_private && duplicateCandidate.metadata?.note && (
+                  <p className="text-[11px] text-zinc-400 line-clamp-2 pt-0.5">
+                    {duplicateCandidate.metadata.note}
+                  </p>
+                )}
               </div>
 
               <p className="text-xs text-zinc-400 leading-relaxed">
-                {userRecs.has(duplicateCandidate.id)
+                {duplicateCandidate.is_private
+                  ? 'Would you like to keep the existing item or save another copy?'
+                  : duplicateCandidate.created_by === user?.id
+                  ? 'You already created and recommended this item.'
+                  : userRecs.has(duplicateCandidate.id)
                   ? 'You have already upvoted this recommendation.'
                   : 'Would you like to upvote this recommendation to add it to your recommendations?'}
               </p>
             </div>
 
+            {status && (
+              <div className={`p-2.5 text-xs font-medium rounded-xl ${
+                status.type === 'error' ? 'bg-rose-950/60 text-rose-300 border border-rose-500/30' : 'bg-white/[0.08] text-white border border-white/20'
+              }`}>
+                {status.msg}
+              </div>
+            )}
+
             {/* Decision Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2 flex-wrap">
               <button
                 type="button"
                 onClick={handleDismissDuplicate}
-                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer"
+                disabled={isSubmitting}
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white rounded-full transition-colors cursor-pointer min-h-[38px]"
               >
-                {userRecs.has(duplicateCandidate.id) ? 'Close' : "No, Don't Upvote"}
+                {duplicateCandidate.is_private
+                  ? 'Cancel'
+                  : isDuplicateOwnOrVoted
+                  ? 'Close'
+                  : "No, Don't Upvote"}
               </button>
 
-              {!userRecs.has(duplicateCandidate.id) && (
+              {duplicateCandidate.is_private ? (
                 <button
                   type="button"
-                  onClick={handleConfirmUpvote}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all cursor-pointer"
+                  onClick={handleForceSavePrivateDuplicate}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-1.5 px-5 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all disabled:opacity-60 cursor-pointer min-h-[38px]"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Yes, Upvote (+1)</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isSubmitting ? 'Saving...' : 'Save Duplicate Anyway'}</span>
                 </button>
+              ) : (
+                !isDuplicateOwnOrVoted && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmUpvote}
+                    disabled={isSubmitting}
+                    className="flex items-center gap-1.5 px-5 py-2 bg-white hover:bg-zinc-200 text-black text-xs font-semibold rounded-full transition-all disabled:opacity-60 cursor-pointer min-h-[38px]"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isSubmitting ? 'Upvoting...' : 'Yes, Upvote (+1)'}</span>
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -307,40 +415,88 @@ export default function AddRecommendationModal({
               />
             </div>
 
-            {/* Live Deduplication Alert while typing */}
+            {/* Live Deduplication Alert while typing (Public + Unlocked Private Vault) */}
             {matchingExistingItems.length > 0 && (
               <div className="p-3 bg-white/[0.04] border border-white/[0.1] rounded-xl space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
-                  <AlertCircle className="w-3.5 h-3.5 text-zinc-400" />
+                  <AlertCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                   <span>Existing recommendations match:</span>
                 </div>
-                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
                   {matchingExistingItems.map(it => {
+                    const ownership = getMatchOwnership(it, user?.id)
                     const alreadyVoted = userRecs.has(it.id)
+                    const catLabel = CATEGORIES.find(c => c.id === it.category)?.label || it.category
+
                     return (
-                      <div key={it.id} className="flex items-center justify-between p-2 bg-[#1A1A1A] border border-white/[0.08] rounded-lg text-xs">
-                        <div>
-                          <span className="font-semibold text-white">{it.title}</span>
-                          <span className="text-[10px] text-zinc-500 ml-2 font-mono uppercase">({it.category})</span>
-                          <span className="text-[10px] text-zinc-500 ml-2 font-mono">{it.recommend_count} recs</span>
+                      <div
+                        key={it.id}
+                        className="flex items-center justify-between gap-2.5 p-2.5 bg-[#1A1A1A] border border-white/[0.08] rounded-xl text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-semibold text-white truncate block">{it.title}</span>
+                          <div className="text-[10px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span className="uppercase text-zinc-300">{catLabel}</span>
+                            <span>•</span>
+                            {ownership.kind === 'own_vault' ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-300">
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>{ownership.sourceLabel}</span>
+                              </span>
+                            ) : (
+                              <>
+                                <span>{ownership.sourceLabel}</span>
+                                <span>•</span>
+                                <span>{it.recommend_count} recs</span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRecommendExisting(it.id)}
-                          className={`px-3 py-1 text-[11px] font-semibold rounded-full flex items-center gap-1 cursor-pointer transition-colors ${
-                            alreadyVoted
-                              ? 'bg-white/10 text-zinc-400 border border-white/10'
-                              : 'bg-white text-black hover:bg-zinc-200'
-                          }`}
-                        >
-                          {alreadyVoted ? <Check className="w-3 h-3" /> : '+1 '}
-                          {alreadyVoted ? 'Upvoted' : 'Upvote'}
-                        </button>
+
+                        <div className="shrink-0">
+                          {ownership.kind === 'own_vault' ? (
+                            <span className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 inline-flex items-center gap-1 select-none whitespace-nowrap">
+                              <Lock className="w-3 h-3" />
+                              <span>{ownership.badgeLabel}</span>
+                            </span>
+                          ) : ownership.kind === 'own_public' ? (
+                            <span className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/[0.08] text-zinc-300 border border-white/10 inline-flex items-center gap-1 select-none whitespace-nowrap">
+                              <Check className="w-3 h-3" />
+                              <span>{ownership.badgeLabel}</span>
+                            </span>
+                          ) : alreadyVoted ? (
+                            <span className="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-white/10 text-zinc-300 border border-white/10 inline-flex items-center gap-1 select-none whitespace-nowrap">
+                              <Check className="w-3 h-3" />
+                              <span>Upvoted</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={upvotingId === it.id}
+                              onClick={() => handleRecommendExisting(it.id)}
+                              className="px-3 py-1.5 min-h-[32px] text-[11px] font-semibold rounded-full flex items-center gap-1 cursor-pointer transition-colors bg-white text-black hover:bg-zinc-200 disabled:opacity-60 whitespace-nowrap"
+                            >
+                              {upvotingId === it.id ? 'Adding...' : '+1 Upvote'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Inline vault sync / locked hint when Private Vault items are unavailable for matching */}
+            {(isPrivate || title.trim().length >= 2) && (isVaultSyncing || lockedVaultCount > 0) && (
+              <p className="text-[11px] font-mono text-zinc-400 flex items-center gap-1.5 leading-snug">
+                <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>
+                  {isVaultSyncing
+                    ? 'Syncing encrypted vault — some private items may not appear in matches yet.'
+                    : `${lockedVaultCount} encrypted vault item${lockedVaultCount === 1 ? ' is' : 's are'} still locked and excluded from matches.`}
+                </span>
+              </p>
             )}
 
             {/* Category Selector */}

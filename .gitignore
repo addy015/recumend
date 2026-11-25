@@ -71,6 +71,8 @@ graphify-out/
 .agents/
 .taste-skill/
 skills-lock.json
+GLOSSARY.md
+docs/
 
 # Scratch & Dev Notes / Test Files
 CurrentIssue.md

@@ -1382,11 +1382,11 @@ export default function MyRecommendations({
                   </div>
 
                   <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 self-stretch sm:self-center justify-between sm:justify-start pt-2 sm:pt-0 border-t border-white/[0.06] sm:border-t-0">
-                    {/* Bottom Left Badge (Private Vault) */}
+                    {/* Bottom Left Badge (Private) */}
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                         <Lock className="w-3 h-3 text-emerald-400" />
-                        <span>Private Vault</span>
+                        <span>Private</span>
                       </span>
                     </div>
 

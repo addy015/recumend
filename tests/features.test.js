@@ -2,6 +2,12 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { formatRecsAsText, buildRecsPdfBinary } from '../src/lib/exportUtils.js'
+import {
+  normalizeRecommendationTitle,
+  findMatchingExistingItems,
+  getMatchOwnership,
+  findPrivateVaultDuplicate
+} from '../src/lib/recommendationMatching.js'
 
 console.log('🧪 Starting Recumend Features Test Suite...\n')
 
@@ -11,6 +17,7 @@ console.log('🧪 Starting Recumend Features Test Suite...\n')
 console.log('Test 1: Native Hover Tooltip / title Attribute Elimination')
 
 const filesToAudit = [
+  'src/components/AddRecommendationModal.jsx',
   'src/components/CategoryFilter.jsx',
   'src/components/CommunityFeed.jsx',
   'src/components/FriendsModal.jsx',
@@ -302,5 +309,114 @@ assert.ok(
 )
 
 console.log('  ✅ Passed: Friends modal username and avatar click-to-profile navigation confirmed.\n')
+
+// ============================================================================
+// TEST 9: Unified Live Matching, Private Vault Deduplication & Toast Responsiveness
+// ============================================================================
+console.log('Test 9: Unified Live Matching, Private Vault Deduplication & Toast Responsiveness')
+
+const currentUserId = 'user-me'
+const samplePublic = [
+  {
+    id: 'pub-mine',
+    title: 'Severance',
+    normalized_title: 'severance',
+    category: 'show',
+    is_private: false,
+    recommend_count: 4,
+    created_by: currentUserId,
+    creator: { username: 'me' }
+  },
+  {
+    id: 'pub-other',
+    title: 'Inception',
+    normalized_title: 'inception',
+    category: 'movie',
+    is_private: false,
+    recommend_count: 12,
+    created_by: 'user-alice',
+    creator: { username: 'alice' }
+  }
+]
+const samplePrivate = [
+  {
+    id: 'priv-unlocked',
+    title: 'Inception',
+    normalized_title: 'enc_abc123',
+    category: 'movie',
+    is_private: true,
+    _isDecrypted: true,
+    created_by: currentUserId
+  },
+  {
+    id: 'priv-locked',
+    title: '[Encrypted Item]',
+    normalized_title: 'enc_locked999',
+    category: 'book',
+    is_private: true,
+    _isDecrypted: false,
+    created_by: currentUserId
+  }
+]
+
+// Empty / punctuation-only queries must not match anything
+assert.equal(normalizeRecommendationTitle('...!!!'), '')
+assert.deepEqual(
+  findMatchingExistingItems({ query: '...', publicItems: samplePublic, privateItems: samplePrivate }),
+  [],
+  'Punctuation-only query must return empty matches'
+)
+
+// Matches across both unlocked Private Vault and Public Recommendations
+const inceptionMatches = findMatchingExistingItems({
+  query: 'Incep',
+  publicItems: samplePublic,
+  privateItems: samplePrivate
+})
+assert.deepEqual(
+  inceptionMatches.map((m) => m.id),
+  ['priv-unlocked', 'pub-other'],
+  'Should match unlocked private vault item and public item while excluding locked items'
+)
+
+assert.deepEqual(getMatchOwnership(samplePrivate[0], currentUserId), {
+  kind: 'own_vault',
+  badgeLabel: 'In Vault',
+  sourceLabel: 'Private Vault'
+})
+assert.deepEqual(getMatchOwnership(samplePublic[0], currentUserId), {
+  kind: 'own_public',
+  badgeLabel: 'Added by you',
+  sourceLabel: 'Your Public'
+})
+assert.deepEqual(getMatchOwnership(samplePublic[1], currentUserId), {
+  kind: 'other_public',
+  badgeLabel: null,
+  sourceLabel: 'Public • @alice'
+})
+
+// Exact Private Vault duplicate check (same title + category)
+assert.equal(
+  findPrivateVaultDuplicate({ title: 'Inception!', category: 'movie', privateItems: samplePrivate })?.id,
+  'priv-unlocked'
+)
+assert.equal(
+  findPrivateVaultDuplicate({ title: 'Inception', category: 'book', privateItems: samplePrivate }),
+  null,
+  'Different category should not trigger exact Private Vault duplicate'
+)
+assert.equal(
+  findPrivateVaultDuplicate({ title: '[Encrypted Item]', category: 'book', privateItems: samplePrivate }),
+  null,
+  'Locked placeholder items must never be treated as plaintext duplicates'
+)
+
+// Toast responsiveness check in App.jsx
+assert.ok(
+  appSourceCode.includes('inset-x-3') && appSourceCode.includes('safe-area-inset-bottom') && appSourceCode.includes('rounded-2xl sm:rounded-full'),
+  'App.jsx toast must support mobile inset width, safe-area bottom offset, and responsive rounding'
+)
+
+console.log('  ✅ Passed: Unified matching, Private Vault dedup, and responsive toast verified.\n')
 
 console.log('🎉 ALL RECUMEND FEATURES TESTS PASSED FLAWLESSLY!\n')
